@@ -1,5 +1,5 @@
 # radcal
-A library of subroutines for calculating radiative properties of gaseous species and smoke.
+A library of subroutines for calculating radiative properties of gaseous species and soot.
 
 RADCAL computes the spectral properties of the radiation participating species at discrete values of the spectrum (expressed either in wavenumber or in wavelength) and temperature, and returns two alternative mean absorption coefficients for each spectral band. The first coefficient is the Planck mean coefficient.  The second coefficient is the so-called path mean or effective absorption coefficient.
 
