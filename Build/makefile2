@@ -40,7 +40,7 @@ intel_win_64_db : $(objwin)
 
 gnu_linux_64 : FFLAGS    = -O -m64 -ffree-form -frecord-marker=4  $(GITINFOGNU)
 gnu_linux_64 : FC        = gfortran
-gnu_linux_64 : exe       = fds2ascii_linux_64
+gnu_linux_64 : exe       = radcal_linux_64
 
 gnu_linux_64 : $(obj)
 	$(FC) -o $(bin)/$(exe) $(obj)
@@ -50,7 +50,7 @@ gnu_linux_64 : $(obj)
 
 gnu_osx_64 : FFLAGS    = -O0 -m64 -ffree-form -frecord-marker=4  $(GITINFOGNU)
 gnu_osx_64 : FC        = gfortran
-gnu_osx_64 : exe       = fds2ascii_osx_64
+gnu_osx_64 : exe       = radcal_osx_64
 
 gnu_osx_64 : $(obj)
 	$(FC) -o $(bin)/$(exe) $(obj)
@@ -62,20 +62,20 @@ gnu_osx_64 : $(obj)
 
 intel_linux_64 : FFLAGS    = -O2 -m64 $(GITINFO)
 intel_linux_64 : FC        = ifort
-intel_linux_64 : exe       = fds2ascii_linux_64
+intel_linux_64 : exe       = radcal_linux_64
 
 intel_linux_64 : $(obj)
 	$(FC) -o $(bin)/$(exe) $(obj)
 
-# ------------- OSX 64 ----------------
-#  64 bit OSX
+# ------------- OSX 64 debug ----------------
+#  64 bit debug OSX
 
-intel_osx_64 : FFLAGS    = -O2 -m64 $(GITINFO)
-intel_osx_64 : FC        = ifort
-intel_osx_64 : exe       = fds2ascii_osx_64
+intel_osx_64_db : FFLAGS = -fpp -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency
+intel_osx_64_db : FC        = ifort
+intel_osx_64_db : exe       = radcal_osx_64
 
-intel_osx_64 : $(obj)
-	$(FC) -o $(bin)/$(exe)  -mmacosx-version-min=10.4 $(obj)
+intel_osx_64_db : $(obj)
+	$(FC) -o $(bin)/$(exe)  $(obj)
 
 #-------------- Clean Target to remove Object and Module files -----------
 
