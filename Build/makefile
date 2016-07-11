@@ -1,71 +1,151 @@
-# Make file for RADCAL
-# Works for the Intel Fortran Compiler
-# Tested on version: ifort (IFORT) 12.1.3 20120212
-# Build RADCAL.x with static library
-# For other coompilers: Make sure to provide path to libraries or remove flag -static-intel
-# make sure your fortran compiler accepts C preprocessor macro
-# 
-# To use:
-# typing "make" will create the instrumented, debugging version of RADCAL with run-time printing
-# typing "make DEBUG=0" creates the production version of RADCAL with optimization flags
-#                       This version is faster than debug
-# typing "make DEBUG=1 PARALL=1" creates the debugging open mp version
-# typing "make DEBUG=0 PARALL=1" creates the production open mp version. Does not improves
-#                                much the performances.
+# Makefile for RADCAL
+
+# To use this makefile, select the appropriate compiler and OS from the list below. For example, to
+# compile the 64 bit parallel version (MPI) of RADCAL under Linux using the Intel compilers type:
 #
-#========================================================================================
+# make mpi_intel_linux_64
 
-DEBUG ?= 1
-PARALL ?= 2
+# A make utility for windows may be downloaded from http://gnuwin32.sourceforge.net/packages/make.htm
 
-today_date = `date`
-compile_date = $(shell date)
+# The variable VPATH defines where the source code is relative to the current directory
 
-ifeq ($(PARALL),1)
-    PARA_FLAG = -openmp -Dopenmp
+VPATH = ../FDS_Source
+
+ifeq ($(shell echo "check_quotes"),"check_quotes")
+# windows
+  BUILD_DATE := $(shell date /t) $(shell time /t)
+  GIT_HASH := $(shell ..\..\Utilities\Scripts\githash)
+  GIT_DATE := $(shell ..\..\Utilities\Scripts\gitlog)
 else
-    PARA_FLAG = 
+# linux/osx
+  GIT_HASH := $(shell git describe --long --dirty)
+  GIT_DATE := $(shell git log -1 --format=%cd)
+  BUILD_DATE := $(shell date "+%b %d, %Y  %T")
+# The preprocessor used by xlf uses comma as separation between preprocessing commands.
+# Commas needs to be escaped if they are to be used as part of a value in a preprocessing variable.
+  BUILD_DATE_XLF := $(shell date "+%b %d\, %Y  %T")  
 endif
 
-ifeq ($(DEBUG), 1)
-    COMP_FLAGS = -fpp -Ddebug -Ddate='"$(compile_date)"' $(PARA_FLAG) -warn unused -debug full  -pg -check all -stand:f08 -r8 -traceback -ftrapuv -c -o  $@
-    LINK_FLAGS = -v  $(PARA_FLAG) -cxxlib -debug -check all -traceback -r8 -pg
-else
-    COMP_FLAGS = -fpp -O2 $(PARA_FLAG) -Ddate='"$(compile_date)"' -r8 -c -o $@
-    LINK_FLAGS = -v $(PARA_FLAG) -cxxlib -r8
-    endif
-
-COMPILE_F90 = ifort $(COMP_FLAGS)
-LINK        = ifort $(LINK_FLAGS)
-
-#========================================================================================
-
-PROG = RADCAL.exe
-
-#========================================================================================
-
-#TARGETS:
-all: executable
-
-clean :; @rm -f *.obj *.mod $(PROG)
-
-#-----------------------------------------------------------------------------------------
-
-OBJ_MAIN =             \
-        RADCAL.obj
-
-#----------------------------------------------------------------------------------------
-#--------------------------------------  Main Routine  -- -------------------------------
-#----------------------------------------------------------------------------------------
-
-RADCAL.obj : RADCAL.f90 
-	$(COMPILE_F90) RADCAL.f90
-
-#========================================================================================
-
-executable:  $(OBJ_MAIN)
-	$(LINK) $(OBJ_MAIN) -o $(PROG)
+GITINFO_BASE=-DGITHASH_PP=\"$(GIT_HASH)\" -DGITDATE_PP=\""$(GIT_DATE)\""
+GITINFO=-fpp $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
+GITINFOGNU=-cpp $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
+GITINFOXLF=-qsuffix=cpp=f90 '-WF,-DGITHASH_PP=\"$(GIT_HASH)\",-DGITDATE_PP=\"$(GIT_DATE)\",-DBUILDDATE_PP=\"$(BUILD_DATE_XLF)\"'
+GITINFOPGI=-Mpreprocess $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
 
 
+# Definition of the non-MPI object variables
 
+obj_serial = prec.o cons.o devc.o type.o mesh.o func.o irad.o main.o
+
+objwin_serial = $(obj_serial:.o=.obj)
+
+# General Purpose Rules
+
+no_target:
+	@echo \******** You did not specify a make target \********
+	@echo Please read the comments at the top of the makefile
+
+setup:
+%.o : %.mod
+
+setup_win:
+%.obj : %.mod
+
+.SUFFIXES: .f90 .o .obj
+
+.f90.o:
+	$(FCOMPL) -c $(FFLAGS) $<
+.f90.obj:
+	$(FCOMPL) -c $(FFLAGS) $<
+
+# Files which have OpenMP compiler directives are compiled using the FOPENMPFLAG and can be enabled/disabled on a per-file basis.
+
+func.o: FFLAGS += $(FOPENMPFLAGS)
+irad.o: FFLAGS += $(FOPENMPFLAGS)
+
+func.obj: FFLAGS += $(FOPENMPFLAGS)
+irad.obj: FFLAGS += $(FOPENMPFLAGS)
+
+# Windows Intel Compiler
+
+#*** note: the following scripts (located in ..\Scripts directory) must be run before running make with this target
+#    ..\Scripts\ifortvars intel64
+
+intel_win_64 : FFLAGS = /O2 /Qipo /traceback $(GITINFO) 
+intel_win_64 : FCOMPL = ifort
+intel_win_64 : FOPENMPFLAGS = /Qopenmp
+intel_win_64 : obj = radcal_win_64
+intel_win_64 : setup_win $(objwin_serial)
+	$(FCOMPL) -o $(obj) $(FFLAGS) $(FOPENMPFLAGS) /F1000000000 $(objwin_serial)
+
+intel_win_64_db : FFLAGS = /Od /nologo /debug:full /check /warn /extend_source:132 /traceback /stand:f08 /Z7 /MDd $(GITINFO) 
+intel_win_64_db : FCOMPL = ifort
+intel_win_64_db : FOPENMPFLAGS = /Qopenmp
+intel_win_64_db : obj = radcal_win_64_db
+intel_win_64_db : setup_win $(objwin_serial)
+	$(FCOMPL) -o $(obj) $(FFLAGS) $(FOPENMPFLAGS) /F1000000000 $(objwin_serial)
+
+# Intel Compiler for Linux
+
+intel_linux_64 : FFLAGS = -m64 -O2 -ipo -traceback $(GITINFO) 
+intel_linux_64 : LFLAGS = -static-intel
+intel_linux_64 : FCOMPL = ifort
+intel_linux_64 : FOPENMPFLAGS = -openmp -openmp-link static -liomp5
+intel_linux_64 : obj = radcal_intel_linux_64
+intel_linux_64 : setup $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+
+intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
+intel_linux_64_db : LFLAGS = -static-intel
+intel_linux_64_db : FCOMPL = ifort
+intel_linux_64_db : FOPENMPFLAGS = -openmp -openmp-link static -liomp5
+intel_linux_64_db : obj = radcal_intel_linux_64_db
+intel_linux_64_db : setup $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+
+# OSX   
+
+intel_osx_64 : FFLAGS = -m64 -O2 $(GITINFO) 
+intel_osx_64 : LFLAGS = -static-intel
+intel_osx_64 : FOPENMPFLAGS = -openmp -openmp-link static
+intel_osx_64 : FCOMPL = ifort
+intel_osx_64 : obj = radcal_intel_osx_64
+intel_osx_64 : setup $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+
+intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
+intel_osx_64_db : LFLAGS = -static-intel
+intel_osx_64_db : FOPENMPFLAGS = -openmp -openmp-link static
+intel_osx_64_db : FCOMPL = ifort
+intel_osx_64_db : obj = radcal_intel_osx_64_db
+intel_osx_64_db : setup $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+
+# *** Object Dependencies ***
+
+cons.o : prec.o
+type.o : prec.o cons.o
+devc.o : prec.o
+mesh.o : prec.o type.o
+func.o : prec.o cons.o type.o mesh.o devc.o
+irad.o : func.o prec.o cons.o type.o mesh.o
+main.o : func.o prec.o cons.o type.o mesh.o irad.o
+
+cons.obj : prec.obj
+type.obj : prec.obj cons.obj
+devc.obj : prec.obj
+mesh.obj : prec.obj type.obj
+func.obj : prec.obj cons.obj type.obj mesh.obj devc.obj
+irad.obj : func.obj prec.obj cons.obj type.obj mesh.obj
+main.obj : func.obj prec.obj cons.obj type.obj mesh.obj irad.obj
+
+#*** Clean Target to remove Object and Module files ***
+
+.PHONY : clean
+clean:
+	-rm -f *.o *.mod *.obj 
+
+.PHONY : winclean
+winclean:
+	-erase *.mod *.obj 
 
