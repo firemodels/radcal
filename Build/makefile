@@ -35,7 +35,7 @@ GITINFOPGI=-Mpreprocess $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
 
 # Definition of the non-MPI object variables
 
-obj_serial = prec.o cons.o devc.o type.o mesh.o func.o irad.o main.o
+obj_serial = rmod.o rcal.o main.o
 
 objwin_serial = $(obj_serial:.o=.obj)
 
@@ -123,21 +123,11 @@ intel_osx_64_db : setup $(obj_serial)
 
 # *** Object Dependencies ***
 
-cons.o : prec.o
-type.o : prec.o cons.o
-devc.o : prec.o
-mesh.o : prec.o type.o
-func.o : prec.o cons.o type.o mesh.o devc.o
-irad.o : func.o prec.o cons.o type.o mesh.o
-main.o : func.o prec.o cons.o type.o mesh.o irad.o
+rcal.o : rmod.o
+main.o : rmod.o rcal.o
 
-cons.obj : prec.obj
-type.obj : prec.obj cons.obj
-devc.obj : prec.obj
-mesh.obj : prec.obj type.obj
-func.obj : prec.obj cons.obj type.obj mesh.obj devc.obj
-irad.obj : func.obj prec.obj cons.obj type.obj mesh.obj
-main.obj : func.obj prec.obj cons.obj type.obj mesh.obj irad.obj
+rcal.obj : rmod.obj
+main.obj : rmod.obj rcal.obj
 
 #*** Clean Target to remove Object and Module files ***
 
