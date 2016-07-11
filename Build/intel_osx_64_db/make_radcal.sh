@@ -2,5 +2,4 @@
 
 source $IFORT_COMPILER/bin/compilervars.sh intel64
 
-rm *.o *.mod
 make VPATH="../../Source" -f ../makefile intel_osx_64_db
