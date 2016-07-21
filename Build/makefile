@@ -7,10 +7,6 @@
 
 # A make utility for windows may be downloaded from http://gnuwin32.sourceforge.net/packages/make.htm
 
-# The variable VPATH defines where the source code is relative to the current directory
-
-VPATH = ../FDS_Source
-
 ifeq ($(shell echo "check_quotes"),"check_quotes")
 # windows
   BUILD_DATE := $(shell date /t) $(shell time /t)
@@ -90,7 +86,7 @@ intel_win_64_db : setup_win $(objwin_serial)
 intel_linux_64 : FFLAGS = -m64 -O2 -ipo -traceback $(GITINFO) 
 intel_linux_64 : LFLAGS = -static-intel
 intel_linux_64 : FCOMPL = ifort
-intel_linux_64 : FOPENMPFLAGS = -openmp -openmp-link static -liomp5
+intel_linux_64 : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
 intel_linux_64 : obj = radcal_intel_linux_64
 intel_linux_64 : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
@@ -98,7 +94,7 @@ intel_linux_64 : setup $(obj_serial)
 intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
 intel_linux_64_db : LFLAGS = -static-intel
 intel_linux_64_db : FCOMPL = ifort
-intel_linux_64_db : FOPENMPFLAGS = -openmp -openmp-link static -liomp5
+intel_linux_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
 intel_linux_64_db : obj = radcal_intel_linux_64_db
 intel_linux_64_db : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
@@ -107,7 +103,7 @@ intel_linux_64_db : setup $(obj_serial)
 
 intel_osx_64 : FFLAGS = -m64 -O2 $(GITINFO) 
 intel_osx_64 : LFLAGS = -static-intel
-intel_osx_64 : FOPENMPFLAGS = -openmp -openmp-link static
+intel_osx_64 : FOPENMPFLAGS = -qopenmp -qopenmp-link static
 intel_osx_64 : FCOMPL = ifort
 intel_osx_64 : obj = radcal_intel_osx_64
 intel_osx_64 : setup $(obj_serial)
@@ -115,7 +111,7 @@ intel_osx_64 : setup $(obj_serial)
 
 intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
 intel_osx_64_db : LFLAGS = -static-intel
-intel_osx_64_db : FOPENMPFLAGS = -openmp -openmp-link static
+intel_osx_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static
 intel_osx_64_db : FCOMPL = ifort
 intel_osx_64_db : obj = radcal_intel_osx_64_db
 intel_osx_64_db : setup $(obj_serial)
