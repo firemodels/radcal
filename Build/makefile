@@ -103,7 +103,7 @@ intel_linux_64_db : setup $(obj_serial)
 
 intel_osx_64 : FFLAGS = -m64 -O2 $(GITINFO) 
 intel_osx_64 : LFLAGS = -static-intel
-intel_osx_64 : FOPENMPFLAGS = -qopenmp -qopenmp-link static
+intel_osx_64 : FOPENMPFLAGS = -openmp -openmp-link static
 intel_osx_64 : FCOMPL = ifort
 intel_osx_64 : obj = radcal_intel_osx_64
 intel_osx_64 : setup $(obj_serial)
@@ -111,7 +111,7 @@ intel_osx_64 : setup $(obj_serial)
 
 intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
 intel_osx_64_db : LFLAGS = -static-intel
-intel_osx_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static
+intel_osx_64_db : FOPENMPFLAGS = -openmp -openmp-link static
 intel_osx_64_db : FCOMPL = ifort
 intel_osx_64_db : obj = radcal_intel_osx_64_db
 intel_osx_64_db : setup $(obj_serial)
