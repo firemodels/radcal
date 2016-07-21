@@ -7,7 +7,7 @@ RADCAL was originally developed by William Grosshandler at the National Institut
 
 ### Installation and running the code
 
-Go to the [Releases]() page and download the appropriate executable for your platform (Windows, OSX, or Linux).
+Go to the [Releases](https://github.com/firemodels/radcal/releases) page and download the appropriate executable for your platform (Windows, OSX, or Linux).
 
 ### Running the code
 
