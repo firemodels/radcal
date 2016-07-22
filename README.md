@@ -7,7 +7,13 @@ RADCAL was originally developed by William Grosshandler at the National Institut
 
 ### Installation and running the code
 
-Go to the [Releases](https://github.com/firemodels/radcal/releases) page and download the appropriate executable for your platform (Windows, OSX, or Linux).  Copy the executable to where ever you store program files.  Add the appropriate environment variables (Windows) or create necessary aliases (OSX, Linux).  For example, on OSX after copying the executable to `/Applications/RADCAL/radcal_intel_osx_64` set up the following alias in your `.bash_profile`:
+Go to the [Releases](https://github.com/firemodels/radcal/releases) page and download the appropriate executable for your platform (Windows, OSX, or Linux).  Copy the executable to where ever you store program files.  Make sure the program is "executable".  On OSX or Linux
+
+```
+$ chmod +x radcal_intel_osx_64
+```
+
+Add the appropriate environment variables (Windows) or create necessary aliases (OSX, Linux).  For example, on OSX after copying the executable to `/Applications/RADCAL/radcal_intel_osx_64` set up the following alias in your `.bash_profile`:
 
 ```
 alias radcal="/Applications/RADCAL/radcal_intel_osx_64"
