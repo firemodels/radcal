@@ -30,3 +30,6 @@ $ radcal RADCAL.IN
 ```
 
 The output is written to the same working directory.
+
+*Further user instructions are under construction!*
+
