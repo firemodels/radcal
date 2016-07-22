@@ -17,7 +17,7 @@ Then exit and relaunch your terminal or source your `.bash_profile`.
 
 ### Running the code
 
-To test your installation, copy the [example input file]() to a working directory.  From within the working directory type the name of the exe followed by the name of the input file.  For example, on OSX
+To test your installation, copy the [example input file](https://github.com/firemodels/radcal/blob/master/Examples/RADCAL.IN) to a working directory.  From within the working directory type the name of the exe followed by the name of the input file.  For example, on OSX
 
 ```
 $ radcal RADCAL.IN
