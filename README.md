@@ -5,7 +5,7 @@ RADCAL computes the spectral properties of the radiation participating species a
 
 RADCAL was originally developed by William Grosshandler at the National Institute of Standards and Technology.  Recent improvements to include additional species were implemented by Vivien Lecoustre at the University of Maryland, College Park.
 
-### Installation and running the code
+### Installation
 
 Go to the [Releases](https://github.com/firemodels/radcal/releases) page and download the appropriate executable for your platform (Windows, OSX, or Linux).  Copy the executable to where ever you store program files.  Make sure the program is "executable".  On OSX or Linux
 
