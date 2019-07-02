@@ -7,12 +7,19 @@ IF "%SETUP_IFORT_COMPILER_64%"=="1" GOTO envexist
   IF DEFINED IFORT_COMPILER14 set IFORT_COMPILER=%IFORT_COMPILER14%
   IF DEFINED IFORT_COMPILER15 set IFORT_COMPILER=%IFORT_COMPILER15%
   IF DEFINED IFORT_COMPILER16 set IFORT_COMPILER=%IFORT_COMPILER16%
+  IF DEFINED IFORT_COMPILER17 set IFORT_COMPILER=%IFORT_COMPILER17%
+  IF DEFINED IFORT_COMPILER18 set IFORT_COMPILER=%IFORT_COMPILER18%
+  IF DEFINED IFORT_COMPILER19 set IFORT_COMPILER=%IFORT_COMPILER19%
+  IF DEFINED IFORT_COMPILER20 set IFORT_COMPILER=%IFORT_COMPILER20%
 
   IF NOT DEFINED IFORT_COMPILER (
-    echo "*** Error: Intel compiler environment variable not defined."
+    echo "*** Error: Intel compiler environment variable, IFORT_COMPILER, not defined."
+    echo "    Intel compilers probably not installed."
+    exit /b
   )
-  IF DEFINED IFORT_COMPILER (
-    echo Setting up compiler environment
-    call "%IFORT_COMPILER%\bin\compilervars" intel64
-  )
+
+  echo Setting up compiler environment
+  set STARTUP="%IFORT_COMPILER%\bin\compilervars"
+  call %STARTUP% intel64
+
 :envexist
