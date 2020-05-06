@@ -152,6 +152,10 @@ plt.figtext(0.15,0.59,r'$\epsilon_{Effective}$ =' + string_emissivity)
 string_Total_trans = " %3.2e" % (Total_trans)
 plt.figtext(0.15,0.56,r'$\tau$' + '\t' + '\t' + '=' + string_Total_trans)
 
+# Print the soot load of the case
+string_soot = " %3.2e" % (1e-5)
+plt.figtext(0.15,0.8,r'$f_{v,soot}$'+ '\t'+ '=' + string_soot)
+
 # Plot the wavenumbers with the highest values on the left
 ax.set_xlim(wave_min,wave_max)
 ax.set_ylim(0,100.1)
