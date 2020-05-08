@@ -1,0 +1,18 @@
+Methane_Soot4:
+&HEADER TITLE="Methane_Soot4" CHID="Methane_Soot4" /
+
+&BAND OMMIN = 50.0
+      OMMAX = 10000.0 /
+&WALL TWALL = 300.0 /
+
+&PATH_SEGMENT ! DEFINE A HOMOGENEOUS SEGMENT
+    T        = 1000.0  ! TEMPERATURE IN KELVIN
+    LENGTH   = 1 ! LENGTH OF THE SEGMENT IN METERS
+    PRESSURE = 1.0    ! PRESSURE IN ATM
+    XCH4    = 0.0133   ! MOLE FRACTION OF ETHYLENE
+    XCO2     = 0.07 ! MOLE FRACTION OF CO2
+    XH2O     = 0.14   ! MOLE FRACTION OF H2O
+    XO2      = 0.01   ! MOLE FRACTION OF O2
+    XN2      = 0.7667 ! MOLE FRACTION OF N2
+    FV       = 1.0E-4/! SOOT VOLUME FRACTION
+#--------------------------------------------------------------------------------

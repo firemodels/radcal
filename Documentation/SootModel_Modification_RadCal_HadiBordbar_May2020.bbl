@@ -1,0 +1,47 @@
+\newcommand{\noop}[1]{}
+\begin{thebibliography}{1}
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{\texttt{#1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\expandafter\ifx\csname href\endcsname\relax
+  \def\href#1#2{#2} \def\path#1{#1}\fi
+
+\bibitem{ChangeCharalampopoulos1990}
+H.~Chang, T.~T. Charalampopoulos,
+  \href{http://www.jstor.org/stable/79956}{Determination of the wavelength
+  dependence of refractive indices of flame soot}, Proceedings: Mathematical
+  and Physical Sciences 430~(1880) (1990) 577--591.
+\newline\urlprefix\url{http://www.jstor.org/stable/79956}
+
+\bibitem{modest2013radiative}
+M.~F. Modest, Radiative Heat Transfer, Academic Press, 2013.
+
+\bibitem{Dalzell1969_soot}
+W.~H. Dalzell, A.~F. Sarofim, \href{https://doi.org/10.1115/1.3580063}{{Optical
+  Constants of Soot and Their Application to Heat-Flux Calculations}}, Journal
+  of Heat Transfer 91~(1) (1969) 100--104.
+\newblock \href
+  {http://arxiv.org/abs/https://asmedigitalcollection.asme.org/heattransfer/article-pdf/91/1/100/5751373/100\_1.pdf}
+  {\path{arXiv:https://asmedigitalcollection.asme.org/heattransfer/article-pdf/91/1/100/5751373/100\_1.pdf}},
+  \href {https://doi.org/10.1115/1.3580063} {\path{doi:10.1115/1.3580063}}.
+\newline\urlprefix\url{https://doi.org/10.1115/1.3580063}
+
+\bibitem{cassol2014application}
+F.~Cassol, R.~Brittes, F.~H. Fran{\c{c}}a, O.~A. Ezekoye, Application of the
+  weighted-sum-of-gray-gases model for media composed of arbitrary
+  concentrations of \ce{H2O}, \ce{CO2} and soot, International Journal of Heat
+  and Mass Transfer 79 (2014) 796--806.
+\newblock \href {https://doi.org/10.1016/j.ijheatmasstransfer.2014.08.032}
+  {\path{doi:10.1016/j.ijheatmasstransfer.2014.08.032}}.
+
+\bibitem{YAGI1961288}
+S.~Yagi, H.~Iino,
+  \href{http://www.sciencedirect.com/science/article/pii/S008207840680514X}{Radiation
+  from soot particles in luminous flames}, Symposium (International) on
+  Combustion 8~(1) (1961) 288 -- 293, eighth Symposium (International) on
+  Combustion.
+\newblock \href {https://doi.org/https://doi.org/10.1016/S0082-0784(06)80514-X}
+  {\path{doi:https://doi.org/10.1016/S0082-0784(06)80514-X}}.
+\newline\urlprefix\url{http://www.sciencedirect.com/science/article/pii/S008207840680514X}
+
+\end{thebibliography}

@@ -1,0 +1,10 @@
+CASEID: Methane_Soot6 TITLE: Methane_Soot6
+-------------------------------------------------------------
+ CALCULATION COMPLETED.
+ TOTAL PATH LENGTH (M):	   1.00000000000000     
+ AMEAN (CM-1):			  1.955840593474580E-002
+ PLANCK MEAN ABSORPTION (CM-1):	  4.592380861231588E-002
+ TOTAL EMISSIVITY:		  0.858554471480674     
+ RECEIVED FLUX (W/M2/STR):	   15513.9653705360     
+ TOTAL TRANSMISSIVITY:		  0.241415982738814     
+-------------------------------------------------------------
