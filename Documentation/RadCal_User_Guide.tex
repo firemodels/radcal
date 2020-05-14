@@ -1,0 +1,174 @@
+\documentclass[11pt]{book}
+
+\typeout{new file: RadCal_User_Guide.tex}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                                                 %
+% The mathematical style of these documents follows                                               %
+%                                                                                                 %
+% A. Thompson and B.N. Taylor. The NIST Guide for the Use of the International System of Units.   %
+%    NIST Special Publication 881, 2008.                                                          %
+%                                                                                                 %
+% http://www.nist.gov/pml/pubs/sp811/index.cfm                                                    %
+%                                                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\input{commoncommands}
+\IfFileExists{gitrevision.tex}
+{\input{gitrevision}}
+{\newcommand{\gitrevision}{unknown} }
+
+\begin{document}
+
+\bibliographystyle{unsrt}
+
+\pagestyle{empty}
+
+\begin{minipage}[t][9in][s]{6.25in}
+
+\huge \flushright{\bf NIST Technical Note 1402 \\ \Large Second Edition}
+
+\vspace{1in}
+
+\Huge \flushright{\bf RadCal: A Narrow-Band Model \\ for Radiation Calculations \\ in a Combustion Environment}
+
+\vfill
+
+\large
+\flushright{ 
+William L. Grosshandler \\
+Vivien R. Lecoustre }
+
+\normalsize
+\vfill
+
+\flushright{
+\includegraphics[width=2.in]{Figures/nistident_flright_vec}
+}
+
+\end{minipage}
+
+\newpage
+
+\hspace{5in}
+
+\newpage
+
+\begin{minipage}[t][9in][s]{6.25in}
+
+\huge \flushright{\bf NIST Technical Note 1402 \\ \Large Second Edition}
+
+\vspace{.75in}
+
+\Huge \flushright{\bf  RadCal: A Narrow-Band Model \\ for Radiation Calculations \\ in a Combustion Environment}
+
+\vspace{.25in}
+\large 
+\flushright{William L. Grosshandler \\
+Vivien R. Lecoustre}
+
+\normalsize
+\vspace{.25in}
+
+\flushright{
+Fire Research Division \\
+Engineering Laboratory  \\
+{\em Gaithersburg, Maryland, USA}}
+
+\vspace{.25in}
+
+\flushright{\today \\
+\emph{Revision:~\gitrevision}}
+
+\vfill
+
+\flushright{\includegraphics[width=1.2in]{Figures/doc} }
+
+\titlesigs
+
+\end{minipage}
+
+\newpage
+
+\begin{minipage}[t][9in][s]{6.25in}
+
+\flushright{Certain commercial entities, equipment, or materials may be identified in this \\
+document in order to describe an experimental procedure or concept adequately. \\
+Such identification is not intended to imply recommendation or endorsement by the \\
+National Institute of Standards and Technology, nor is it intended to imply that the \\
+entities, materials, or equipment are necessarily the best available for the purpose.
+}
+
+\vspace{3in}
+
+\large
+\flushright{\bf National Institute of Standards and Technology Technical Note \\
+Natl.~Inst.~Stand.~Technol.~Tech.~Note, \pageref{LastPage} pages (August 2020) \\
+CODEN: NSPUE2 }
+
+\vfill
+
+\hspace{1in}
+
+\end{minipage}
+
+\newpage
+
+\frontmatter
+
+\pagestyle{plain}
+
+\chapter{Abstract}
+
+RadCal is a narrow-band radiation solver for combustion and fire applications. It spectrally solves the radiative transfer equation along a one-dimensional, line-of-sight in homogeneous and non-homogeneous semi-transparent media for conditions typical of fire and furnaces. Emphasis is on the infra-red part of the spectrum, although the user is free to defined the range of interest.
+
+Originally developed with a spectral characterization of $\rm CO_2$, CO, $\rm H_2O$, $\rm CH_4$, and soot, the code has been enhanced with the addition of new species: $\rm C_2H_4$ (ethylene), $\rm C_2H_6$ (ethane), $\rm C_3H_6$ (propylene), $\rm C_3H_8$ (propane), $\rm C_7H_8$ (toluene), $\rm C_7H_{16}$ (\textit{n}-heptane), $\rm CH_3OH$ (methanol), and $\rm C_5H_8O_2$ (methyl methacrylate). The spectrum of these species can be calculated using Malkmus narrow-band parameters prepared from the experimental FTIR measurements of Wakatsuki and Yilmaz at ambient to elevated temperatures.
+
+In addition to the addition of new species, significant modifications have been made to the numerical solver. The code has been entirely rewritten in modern Fortran to increase code readability, modularity, and to facilitate its integration within the NIST Fire Dynamics Simulator. The structure of the input file has been modified and the code now offers the possibility to compute the spectrum of any hydrocarbon mixture.
+
+This report aims to provide a complete description of the models used in solving the radiative heat transfer equation. Emphasis is on the Lorentz line narrow-band models used in the code: Elsasser, Goody, and Malkmus. The report presents the different species that were already present in the original version of RadCal. It then presents the radiative coefficients for various fuels derived from FTIR experiments conducted at the National Institute of Standards and Technology. A description of the method used to extract the narrow-band coefficients is included, and these new narrow-band model coefficients, spectral mean absorption coefficients, and band overlap parameters are presented in detail for each of the new species, along with several verifications tests. This report also features a description of the new input file, a thorough presentation of the code structure, and several code verification and validation tests.
+
+\chapter{Disclaimer}
+
+The US Department of Commerce makes no warranty, expressed or implied,
+to users of RadCal, and accepts no responsibility for its use.
+Users of RadCal assume sole responsibility under Federal law for determining
+the appropriateness of its use in any particular application;
+for any conclusions drawn from the results of its use; and for any
+actions taken or not taken as a result of analysis performed using these tools.
+
+Users are warned that RadCal is intended for use only by those competent
+in the fields of heat transfer and fire science,
+and is intended only to supplement the informed judgment of the qualified user.
+The software package is a computer model that may or may not have predictive
+capability when applied to a specific set of factual circumstances.
+Lack of accurate predictions by the model could lead to erroneous
+conclusions with regard to fire safety. All results should be evaluated by an informed user.
+
+Throughout this document, the mention of computer hardware or commercial
+software does not constitute endorsement by NIST, nor does it indicate that
+the products are necessarily those best suited for the intended purpose.
+
+
+\chapter{Acknowledgments}
+
+The authors would like to acknowledge the tremendous experimental work of Kaouru Wakatsuki and Aykut Yilmaz. Their experimental characterization of the infra-red spectrum of several hydrocarbons at different temperatures, under the careful supervision and help from Gregory Jackson and Anthony Hamins, has been the stepping stone of this version of RadCal. This work is the direct continuation of their experimental work. Finally, the authors are indebted to John De Ris and Robert Hall for kindly reviewing the manuscript.
+
+\newpage
+
+\tableofcontents
+
+\mainmatter
+
+\include{Introduction_Chapter}
+\include{Band_Models_Chapter}
+\include{Old_Species_RADCAL_Chapter}
+\include{New_Species_RADCAL_Chapter}
+\include{Using_RADCAL_Chapter}
+\include{Structure_code_Chapter}
+\include{Verification_Tests_Chapter}
+\include{Validation_Tests_Chapter}
+
+\bibliography{Radcal_refs}
+
+\end{document}

@@ -1,0 +1,1372 @@
+% !TEX root = RadCal_User_Guide.tex
+
+\typeout{new file: Structure_code_Chapter.tex}
+
+\chapter{Structure of the Code}
+\label{chap:Code}
+This chapter presents the structure of the code and the diverse subroutines and functions that comprise it. Originally written in FORTRAN 77, RadCal has been rewritten in Fortran 2008 to benefit from the recent language updates. Furthermore, the code has been divided into modules, subroutine, and functions for ease of code maintenance and understanding.
+
+
+RadCal source file, \verb=RADCAL.f90=, contains one main module, named \verb=radcal=, and one main program or driver, named \verb=driver=, which uses the \verb=radcal= module. The \verb=radcal= module contains about 40 functions and subroutines that initialize the different species spectral data (mean absorption coefficient $\bar{\kappa}$ and for some species the overlap parameter $\beta$), discretize the spectral range, solve the radiative transfer equation (RTE) for homogeneous and/or non-homogeneous paths, extract the adequate spectral data, interpolate the data when needed, read the input file \verb=RADCAL.in=, deallocate memory prior to exiting RadCal, print some error messages whenever some errors are raised. The \verb=radcal= module is self-consistent. The only dependence is \verb=OpenMP= which is only required when the code is compiled using the makefile \verb-PARALL=1- flag.
+
+
+The program \verb=driver= contains also one subroutine that creates the TECPLOT file named \verb=<CASEID>.tec=, and plots in ASCII format the wavenumber, the spectral transmissivity, and the incidents spectral intensity. The \verb=driver= program starts by a call to the intrinsic routine \verb=cpu_time= to initialize the system chronometer (it is used to assess the execution time of RadCal) and opens or creates the output file \verb=RADCAL.out=. It then calls the subroutine \verb=read_input= from the \verb=radcal= module to read the input file \verb=RADCAL.in= and populates the needed variables. Then \verb=driver= calls \verb=init_radcal= to initialize the species spectral variables; the scope of these variables is limited to the entire module, they cannot be accessed from the \verb=driver= program as they have the \verb=private= attribute.
+
+
+Once the data are initialized, the \verb=driver= program calls \verb=sub_radcal= which solves the RTE over the user defined spectral range, calculates and returns the integrated quantities presented in Section~\ref{sec::Output}. The main program then writes in the output file \verb=RADCAL.out= the appropriate data, and calls \verb=tau_print= to print the wavenumber in $\rm cm^{-1}$, the spectral transmissivity in \%, and the incident spectral intensity in $\rm W/m^{2}/str/cm^{-1}$.
+Finally the \verb=driver= program calls \verb=rcdealloc= to deallocate the variables allocated in \verb=init_radcal= and calls \verb=cpu_time= to returns the execution time. If the code was compiled using the makefile \verb-DEBUG=1- flag, then RadCal prints the execution time in \textit{ms}, along with the \verb=svn= version of RadCal used, the date at which this version of RadCal has been committed into the \verb=svn= system, and the date at which the code has been compiled. RadCal then stops.
+
+\section{RadCal Module}
+
+\subsection{RadCal Variables}
+ \begin{lstlisting}
+ character(255), parameter, private :: Radcalid='$Id: RADCAL.f90 51 2014-06-05 18:56:35Z vlecous1 $'
+ character(255), parameter, public  :: Radcalrev='$Revision: 51 $'
+ character(255), parameter, public  :: Radcaldate='$Date: 2014-06-05 14:56:35 -0400 (Thu, 05 Jun 2014) $'
+
+ character(255), parameter, public :: date_compile = date
+
+ integer, parameter :: fb = selected_real_kind(6)
+ integer, parameter :: eb = selected_real_kind(12)
+
+ integer, public :: n_threads
+
+    character(len=32)           :: radcal_id
+    character(len=32)           :: id
+    character(len=2048)         :: comments
+    real(eb), pointer, dimension(:) :: bands
+    real(eb), pointer, dimension(:) :: temp_exp
+
+ integer, parameter :: n_species = 16      ! number of radcal species (including soot) plus nitrogen and oxygen
+ integer, parameter :: n_species_gas = n_species-1 ! number of radcal gaseous species
+
+ type(elements), dimension(n_species) :: species !
+
+ character(len=255) :: chid  ! radcal case id
+ character(len=255) :: title ! radcal case title
+
+ real(eb), allocatable, dimension(:,:) :: gamma, sd15, sd, sd7, sd3
+
+ integer :: n_temp_c3h6,   n_band_c3h6
+ integer :: n_temp_c3h8,   n_band_c3h8
+ integer :: n_temp_c7h16,  n_band_c7h16
+ integer :: n_temp_c7h8,   n_band_c7h8
+ integer :: n_temp_ch4,    n_band_ch4
+ integer :: n_temp_ch3oh,  n_band_ch3oh
+ integer :: n_temp_c5h8o2, n_band_c5h8o2
+ integer :: n_temp_c2h6,   n_band_c2h6
+ integer :: n_temp_c2h4,   n_band_c2h4
+
+ integer :: i_model_c3h6   ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_c3h8   ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_c7h16  ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_c7h8   ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_ch3oh  ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_c5h8o2 ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_c2h6   ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_c2h4   ! 1: goody, 2: malkmus, 3: elsasser
+
+ integer :: i_model_co2   ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_h2o   ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_co    ! 1: goody, 2: malkmus, 3: elsasser
+ integer :: i_model_ch4   ! 1: goody, 2: malkmus, 3: elsasser
+
+ real(eb), allocatable, dimension(:)    :: sd_c3h6_temp
+ real(eb), allocatable, dimension(:)    :: sd_c3h8_temp
+ real(eb), allocatable, dimension(:)    :: sd_c7h16_temp
+ real(eb), allocatable, dimension(:)    :: sd_c7h8_temp
+ real(eb), allocatable, dimension(:)    :: sd_ch3oh_temp
+ real(eb), allocatable, dimension(:)    :: sd_c5h8o2_temp
+ real(eb), allocatable, dimension(:)    :: sd_c2h6_temp
+ real(eb), allocatable, dimension(:)    :: sd_ch4_temp
+ real(eb), allocatable, dimension(:)    :: sd_c2h4_temp
+
+ real(eb), allocatable, dimension(:)    :: be_c3h6
+ real(eb), allocatable, dimension(:)    :: be_c3h8
+ real(eb), allocatable, dimension(:)    :: be_c7h16
+ real(eb), allocatable, dimension(:)    :: be_c7h8
+ real(eb), allocatable, dimension(:)    :: be_ch3oh
+ real(eb), allocatable, dimension(:)    :: be_c5h8o2
+ real(eb), allocatable, dimension(:)    :: be_c2h6
+ real(eb), allocatable, dimension(:)    :: be_c2h4
+
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_ch4
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_c3h6
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_c3h8
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_c7h16
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_ch3oh
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_c2h6
+ real(eb), allocatable, target, dimension(:,:)  :: om_bnd_c2h4
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_ch4
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_ch4
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_c3h6
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_c3h6
+ real(eb), allocatable, target, dimension(:,:)  :: sd3_c3h6
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_c3h8
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_c3h8
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_c7h16
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_c7h16
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: sd3_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: sd4_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: sd5_c7h8
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_ch3oh
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_ch3oh
+ real(eb), allocatable, target, dimension(:,:)  :: sd3_ch3oh
+ real(eb), allocatable, target, dimension(:,:)  :: sd4_ch3oh
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: sd3_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: sd4_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: sd5_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: sd6_c5h8o2
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_c2h6
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_c2h6
+ real(eb), allocatable, target, dimension(:,:)  :: sd3_c2h6
+
+ real(eb), allocatable, target, dimension(:,:)  :: sd1_c2h4
+ real(eb), allocatable, target, dimension(:,:)  :: sd2_c2h4
+ real(eb), allocatable, target, dimension(:,:)  :: sd3_c2h4
+ real(eb), allocatable, target, dimension(:,:)  :: sd4_c2h4
+
+ real(eb), allocatable, target, dimension(:,:)  :: gammad1_c3h6
+ real(eb), allocatable, target, dimension(:,:)  :: gammad2_c3h6
+ real(eb), allocatable, target, dimension(:,:)  :: gammad3_c3h6
+
+ real(eb), allocatable, target, dimension(:,:)  :: gammad1_c3h8
+ real(eb), allocatable, target, dimension(:,:)  :: gammad2_c3h8
+
+ real(eb), allocatable, target, dimension(:,:)  :: gammad1_c7h16
+ real(eb), allocatable, target, dimension(:,:)  :: gammad2_c7h16
+
+ real(eb), allocatable, target, dimension(:,:)  :: gammad1_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: gammad2_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: gammad3_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: gammad4_c7h8
+ real(eb), allocatable, target, dimension(:,:)  :: gammad5_c7h8
+
+ real(eb), allocatable, target, dimension(:,:)  :: gammad1_ch3oh
+ real(eb), allocatable, target, dimension(:,:)  :: gammad2_ch3oh
+ real(eb), allocatable, target, dimension(:,:)  :: gammad3_ch3oh
+ real(eb), allocatable, target, dimension(:,:)  :: gammad4_ch3oh
+
+ real(eb), allocatable, target, dimension(:,:)  :: gammad1_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: gammad2_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: gammad3_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: gammad4_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: gammad5_c5h8o2
+ real(eb), allocatable, target, dimension(:,:)  :: gammad6_c5h8o2
+
+ real(eb), allocatable, target, dimension(:,:)  :: gammad1_c2h6
+ real(eb), allocatable, target, dimension(:,:)  :: gammad2_c2h6
+ real(eb), allocatable, target, dimension(:,:)  :: gammad3_c2h6
+
+ real(eb), allocatable, target, dimension(:,:)  :: gammad1_c2h4
+ real(eb), allocatable, target, dimension(:,:)  :: gammad2_c2h4
+ real(eb), allocatable, target, dimension(:,:)  :: gammad3_c2h4
+ real(eb), allocatable, target, dimension(:,:)  :: gammad4_c2h4
+
+ real(eb), dimension(:,:), pointer, private :: kappa_d, gamma_d
+ real(eb), dimension(:),   pointer, private :: band_omega
+
+
+ real(eb), allocatable, dimension(:)  :: ab, wave_number, lambda
+ real(eb), allocatable, dimension(:)  :: incident_radiance
+
+ real(eb), allocatable, dimension(:,:) :: ttau
+
+ real(eb), allocatable, dimension(:,:) :: partial_pressures_atm
+ real(eb), allocatable, dimension(:)   :: temp_gas
+ real(eb), allocatable, dimension(:)   :: segment_length_m
+ real(eb), allocatable, dimension(:)   :: total_pressure_atm
+
+ real(eb) :: ommin, ommax, lambdamin, lambdamax
+ real(eb) :: twall, tau, xtot, fv
+
+ integer :: nom, npt
+
+
+ real(eb), parameter :: sigma   = 5.670400e-8_eb
+ real(eb), parameter :: m_to_cm = 100.0_eb  ! convertion factor meters -> centimeters
+ real(eb), parameter :: cm_to_m = 0.01_eb   ! convertion factor centimeters -> meters
+
+ character(30) :: radcal_id
+ real(eb) :: pfuel
+
+ real(eb), parameter :: zero_p    = tiny(sigma)
+ real(eb), parameter :: pi        = acos(-1.0)
+ real(eb), parameter :: sqrtpi    = sqrt(pi)
+ real(eb), parameter :: rpi_sigma = sigma/pi
+
+ integer :: i_co, i_co2, i_h2o, i_n2, i_o2, i_fv, i_c2h4, i_c2h6, i_c3h6, i_c3h8
+ integer :: i_c7h8, i_c7h16, i_ch3oh, i_ch4, i_ch4_old, i_mma
+
+
+\end{lstlisting}
+
+Note: variables \verb=sd_<species>_temp= contain the temperature corresponding to the experimental conditions at which the mean absorption coefficient \verb=sd<band index>_<species>= (example: \verb=sd1_ch4=) and the band overlap parameter \verb=gammad<band index>_<species>= (example: \verb=gammad1_c7h8=) where obtained from. The variables \verb=om_bnd_<species>= contain the lower, the upper bounds, and the narrow band size (in wavenumber) of a species main band.
+
+\subsection{Subroutine init\_radcal}
+\label{sub:init_radcal}
+\begin{lstlisting}
+subroutine init_radcal(io)
+\end{lstlisting}
+
+Initializes variables \verb=nom=, vectors \verb=wave_number= and \verb=lambda=, and calls \verb=rcalloc= based on parameters present in input file \verb=radcal.in=.
+
+\begin{lstlisting}
+ integer, intent(in) :: io
+ real(eb) :: dom, omega
+ integer :: i_wavenumb
+\end{lstlisting}
+
+
+\subsection{Subroutine sub\_radcal}
+\label{sub:sub_radcal}
+\begin{lstlisting}
+subroutine sub_radcal(effective_absorption,planck_mean_absorption,radiance,
+total_transmissivity,io)
+\end{lstlisting}
+input variables:
+\begin{itemize}
+ \item io: (integer) output file unit
+\end{itemize}
+output variables:
+\begin{itemize}
+ \item \verb=effective_absorption=   : (real) effective absorption coefficient, in $\rm cm^{-1}$, as defined by Eq.~\ref{eq:effective_epsilon}
+ \item \verb=planck_mean_absorption= : (real) planck mean absorption coefficient, in $\rm cm^{-1}$, as defined by Eq.~\ref{eq::planck_mean}
+ \item \verb=radiance=               : (real) incident power per unit of area per                                  unit of solid angle, units: $\rm W/m^{2}/str/cm^{-1}$, as defined by Eq.~\ref{eq::received_flux}
+ \item \verb=total_transmissivity=   : (real) total transmissivity, as defined by Eq.~\ref{eq::total_transmissivity}, computed only when \verb=TWALL= (blackbody wall temperature $T_{w}$) is strictly greater than 0. Dimensionless number
+\end{itemize}
+Local variables:
+\begin{itemize}
+ \item \verb=a_collision= : (real) collision broadened fine structure parameter, as defined by Eq.~\ref{eq::beta}
+ \item \verb=a_doppler=   : (real) doppler broadened fine structure parameter, as defined by Eq.~\ref{eq::beta}
+ \item \verb=azotemp=     : (real) ratio reference temperature (273~K) over local temperature, $= 273/T$
+ \item \verb=omega=       : (real) wavenumber
+ \item \verb=optical_thickness=: (real) optical thickness of the ith species,  units: cmstp
+ \item \verb=ptot=        : (real) total pressure in atm
+ \item \verb=temp4=       : (real) local temperature raised to the power 4
+ \item \verb=x_collision= : (real) optical depth for a pure collision curve of growth, as defined by Eq.~\ref{eq::Collision_optical_depth}
+ \item \verb=x_doppler=   : (real) optical depth for a pure doppler curve of growth, as defined by Eqs.~\ref{eq::Doppler_optical_path_Goody} and \ref{eq::Doppler_optical_path_Malkmus}
+ \item \verb=x_particle=  : (real) optical depth for particle, as defined by Eq.~\ref{eq::soot_optical_depth}
+\end{itemize}
+This is the most important subroutine of the RadCal module. This function solves the RTE as defined by Eqs.~\ref{eq::RTE_wavenumber_H} and \ref{eq::RTE_wavenumber_NH} and returns the effective absorption coefficient, the Planck mean absorption coefficient, the total transmissivity, and populates the global variables \verb=incident_radiance= (spectral incident intensity as defined by Eq.~\ref{eq::received_flux}) and \verb=ttau= (spectral transmissivities used in Eq.~\ref{eq::RTE_wavenumber_NH}).
+
+\begin{lstlisting}
+ integer, intent(in) :: io
+ real(eb), intent(out) :: effective_absorption, planck_mean_absorption,radiance, total_transmissivity
+
+ real(eb), allocatable, dimension(:)   :: path_length_cm, azotemp
+ real(eb), allocatable, dimension(:)   :: taus, taul, x_particle, ab_planck,ab_tau, bb_spect, bb_gas, bb_wall
+ real(eb), allocatable, dimension(:,:) :: curtis_xstar, curtis_acollision,curtis_adoppler, gc,optical_thickness, optical_depth
+ real(eb) :: rsl, rss, omega, wave_length,  dambda, lterm, temp4,avg_temp, total_length_cm, int_bb_gas, int_bb_wall
+ integer :: i_wavenumb, kmax, kmin, i_path, i_species
+\end{lstlisting}
+
+\subsection{Function collision\_broadening}
+\label{fun:collision_broadening}
+\begin{lstlisting}
+function collision_broadening(species_pressure_atm,ptot,azotemp) result(gc)
+\end{lstlisting}
+ This function computes the collision broadening half-width at half-maximum (HWHM). Calculation proceeded in accordance with the SLG model, Table 5-18, in nasa sp-3080, based on eq 5-34 from Ref.~\cite{Ludwig1973}, also presented in Eq.~\ref{eq:gamma_L}. It returns vector \verb=gc= that contains the collision broadening HWHM including foreign and self-broadening collision coefficients. \verb=gc= units in $\rm cm^{-1}$.
+
+\begin{lstlisting}
+ real(eb), dimension(:), intent(in) :: species_pressure_atm ! species partial pressure, units: atm
+ real(eb), intent(in) :: ptot         ! total pressure, units: atm
+ real(eb), intent(in) :: azotemp      ! recall azotemp = 273/T, units: none
+
+ real(eb), allocatable, dimension(:) :: gc ! units in cm-1
+ real(eb) :: p_fuel
+ integer, dimension(6) :: i_indices
+ integer :: i, ii, i_fuel
+\end{lstlisting}
+
+
+\subsection{Subroutine species\_optical\_depth}
+\label{sub:species_optical_depth}
+
+\begin{lstlisting}
+subroutine species_optical_depth(path_length_cm,p_atm,ptot,gc,temp,omega,optical_thickness,
+curtis_xstar,curtis_acollision, curtis_adoppler,optical_depth)
+\end{lstlisting}
+This subroutine computes the species optical depth for all the species given a wavenumber \verb=omega= and species optical thickness.
+It returns the optical depth for each species using the Curtis Godson approximation. Follows method presented in Sections~\ref{sec::homogeneous_path} and \ref{sec::Curtis_Godson}.
+
+Arguments in:
+\begin{itemize}
+ \item \verb=path_length_cm= : scalar, physical length, in cm
+ \item \verb=p_atm=           : vector, (dimension \verb=nspecies=) species partial pressure, in atm
+ \item \verb=ptot=             : scalar, total pressure, in atm
+ \item \verb=gc=               : vector, collision-broadened half-width values, in $\rm cm^{-1}$
+ \item \verb=temp=             : scalar, local temperature, in K
+ \item \verb=omega=            : scalar, wavenumber, in $\rm cm^{-1}$
+ \item \verb=optical_thickness=: vector (dimension \verb=nspecies=) elements, units in stp.cm.atm
+\end{itemize}
+
+Arguments inout:
+ variables used to compute the Curtis-Godson approximation parameters. The first value (\textit{i.e.}) \verb=(nspecies,1)= was either computed previously or is equal to 0 (for the first point).
+\begin{itemize}
+ \item \verb=curtis_xstar=      : array of values of $\bar{\kappa}U$. Dimension: \verb=(nspecies,2)=
+ \item \verb=curtis_acollision= : array of values of $\beta$. Dimension: \verb=(nspecies,2)=
+ \item \verb=curtis_adoppler=   : array of values of $\gamma_D/d$. Dimension: \verb=(nspecies,2)=
+ \item \verb=optical_depth=     : array of values of elements optical depth, dimensionless, dimension: \verb=(nspecies,2)=.
+\end{itemize}
+
+\begin{lstlisting}
+ real(eb), dimension(:), intent(in) :: p_atm, optical_thickness, gc
+ real(eb), intent(in) :: ptot, temp, omega, path_length_cm
+
+ real(eb), dimension(:,:), intent(inout) :: curtis_xstar, curtis_acollision,curtis_adoppler, optical_depth
+ real(eb) :: x_doppler, x_collision, xstar
+ real(eb) :: sdweak,    a_collision, a_doppler
+ integer  :: i_model ! model used for snb fitting: 1: goody, 2 malkmus, 3 elsasser
+ integer  :: i
+\end{lstlisting}
+
+\subsection{Function growth\_doppler}
+
+\begin{lstlisting}
+elemental function growth_doppler(xstar,a_doppler,i_model) result(x_doppler)
+\end{lstlisting}
+
+This function computes the Doppler curve of growth. Solves either Eq.~\ref{eq::Doppler_optical_path_Goody} (if i\_model=1 or 3) or Eq.~\ref{eq::Doppler_optical_path_Malkmus} (for i\_model=2).
+
+Variables in:
+\begin{itemize}
+ \item \verb=xstar=: optical pathlength * mean absorption coefficient, $\bar{\kappa}U$
+ \item \verb=a_doppler=: Doppler fine structure parameter, $\gamma_D/d$
+ \item \verb=i_model=: model used for SNB fitting: 1: Goody, 2 Malkmus, 3 Elsasser
+\end{itemize}
+
+Variable out:
+\begin{itemize}
+ \item \verb=x_doppler=.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in) :: xstar
+real(eb), intent(in) :: a_doppler
+integer,  intent(in) :: i_model
+
+real(eb) :: x_doppler
+\end{lstlisting}
+
+\subsection{Function combined\_lines}
+
+\begin{lstlisting}
+elemental function combined_lines(x_collision, x_doppler, xstar) result(optical_depth)
+\end{lstlisting}
+
+Computes the combined collision (Lorentz) and Doppler optical depths, and the optical depth based on Eqs.~\ref{eq::combined_optical_path} and \ref{eq::trans_HPP_final}. See Section~\ref{sec::homogeneous_path}.
+
+Variables in:
+\begin{itemize}
+ \item \verb=x_collision=: Lorentz curve of growth
+ \item \verb=x_doppler=: Doppler curve of growth
+ \item \verb=xstar=: optical pathlength * mean absorption coefficient
+\end{itemize}
+
+Variable out:
+\begin{itemize}
+ \item \verb=optical_depth=.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in) :: x_collision
+real(eb), intent(in) :: x_doppler
+real(eb), intent(in) :: xstar
+
+real(eb) :: optical_depth
+real(eb) :: y_doppler, y_collision, y_combined
+\end{lstlisting}
+
+\subsection{Function Goody}
+
+\begin{lstlisting}
+elemental function goody(xstar,a_collision) result(x_goody)
+\end{lstlisting}
+ Function computes the equivalent line width over the average line spacing using the goody statistical model, as defined by Eq.~\ref{eq::Goody}.
+
+ Variables in:
+ \begin{itemize}
+  \item \verb=xstar=: optical pathlength * mean absorption coefficient
+  \item \verb=a_collision= : fine structure parameter or overlap parameter $\beta$, see Eq.~\ref{eq::beta}.
+  \end{itemize}
+
+Returns \verb=x_goody=.
+
+\begin{lstlisting}
+real(eb), intent(in) :: xstar
+real(eb), intent(in) :: a_collision
+
+real(eb)  :: x_goody
+\end{lstlisting}
+
+
+\subsection{Function Malkmus}
+
+\begin{lstlisting}
+elemental function malkmus(xstar,a_collision) result(x_malkmus)
+\end{lstlisting}
+Function computes the equivalent line width over the average line spacing, using the Malkmus statistical model. See Eq.~\ref{eq::Malkmus}.
+
+Variables in:
+\begin{itemize}
+ \item \verb=xstar=: optical pathlength * mean absorption coefficient
+  \item \verb=a_collision= : fine structure parameter or overlap parameter $\beta$, see Eq.~\ref{eq::beta}
+\end{itemize}
+
+Returns \verb=x_malkmus= (optical depth for a pure collision curve).
+
+\begin{lstlisting}
+real(eb), intent(in) :: xstar
+real(eb), intent(in) :: a_collision
+
+real(eb)  :: x_malkmus
+\end{lstlisting}
+
+\subsection{Function Elsasser}
+
+\begin{lstlisting}
+elemental function elsasser(xstar,a_collision) result(x_elsasser)
+\end{lstlisting}
+
+This function computes the equivalent line width over the average line spacing using the Elsasser statistical model, see Eq.~\ref{eq::Elsasser}.
+
+Variables in:
+\begin{itemize}
+ \item \verb=xstar=: optical pathlength * mean absorption coefficient
+ \item \verb=a_collision= : fine structure parameter or overlap parameter $\beta$, see Eq.~\ref{eq::beta}
+\end{itemize}
+
+Returns \verb=x_elsasser=.
+
+\begin{lstlisting}
+real(eb), intent(in) :: xstar
+real(eb), intent(in) :: a_collision
+
+real(eb)  :: x_elsasser
+real(eb) :: x_collision
+\end{lstlisting}
+
+\subsection{Function partition\_function}
+
+\begin{lstlisting}
+pure function partition_function(transition_wn,degeneracy,temp)
+\end{lstlisting}
+
+This function calculates the partition function of a harmonic quantum oscillator knowing the different frequencies and degeneracies.
+
+\begin{lstlisting}
+real(eb), dimension(:), intent(in) :: transition_wn ! Wavenumber associated with
+
+integer, dimension(:), intent(in) :: degeneracy  ! Denegeracy of energy level
+
+real(eb), intent(in) :: temp                     ! Temperature in Kelvin
+
+real(eb) :: partition_function
+
+real(eb), parameter :: q2 = 1.4388_eb   ! speed of light*planck cns/boltzmann
+real(eb) :: q2_over_T
+integer  :: n_mode
+integer  :: i_mode
+\end{lstlisting}
+
+
+\subsection{Function approx\_vib\_rot}
+
+\begin{lstlisting}
+pure subroutine approx_vib_rot(transition_matrix,line_strength,om,temp,omega,  &
+                               bcnt,be,gc1, gd, gdinv,gddinv,sdweak,line_spacing)
+\end{lstlisting}
+
+\begin{lstlisting}
+integer, dimension(:,:), intent(in) :: transition_matrix ! Square matrix
+real(eb), dimension(:),   intent(in) :: bcnt ! Band center in wavenumbers (cm-1)
+real(eb), dimension(:),   intent(in) :: om
+real(eb), dimension(:),   intent(in) :: line_strength
+
+real(eb), intent(in) :: omega ! Wavenumber of sought properties
+real(eb), intent(in) :: be    ! Rotational constant
+real(eb), intent(in) :: temp  ! Temperature in Kelvin
+real(eb), intent(in) :: gc1
+real(eb), intent(in) :: gd
+real(eb), intent(in), optional :: line_spacing ! Optional
+
+real(eb), intent(out) :: sdweak
+real(eb), intent(out) :: gdinv
+real(eb), intent(out) :: gddinv
+
+real(eb), dimension(:), allocatable :: transition_wn, atot
+real(eb), parameter :: q2 = 1.4388_eb   ! speed of light*planck cns/boltzmann
+real(eb), parameter :: t0 = 300._eb     ! reference temperature, in kelvin
+
+real(eb) :: t0ot
+real(eb) :: q2ot
+real(eb) :: dinv
+
+integer  :: n_transitions
+integer  :: n_vibrations
+integer :: i_transition
+\end{lstlisting}
+
+\subsection{Subroutine co2}
+
+\begin{lstlisting}
+elemental subroutine co2(omega,temp,gc1,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+Given \verb=omega= (wavenumber in $\rm cm^{-1}$), \verb=temp= (temperature in K), and \verb=gc1= (half width at half maximum for Lorentz line, in $\rm cm^{-1}$), this subroutine returns the spectral properties of $\rm CO_2$: spectral mean absorption coefficient (\verb=sdweak=), the collision broadening fine structure parameter (\verb=gdinv=), the Doppler broadening fine structure parameter (\verb=gddinv=), and the narrow band model used (\verb=i_model=).
+
+\begin{lstlisting}
+real(eb), intent(in) :: omega ! wavenumber, units in cm-1
+real(eb), intent(in) :: temp  ! temperature, units in kelvin
+real(eb), intent(in) :: gc1   ! half width at half maximum for lorentz line, units in cm-1
+
+real(eb), intent(out):: sdweak  ! narrow band mean absortion coefficient, units in cm-1
+real(eb), intent(out):: gdinv   ! line width to line spacing ration for lorentz lines
+real(eb), intent(out):: gddinv  ! line width to line spacing ration for doppler
+integer,  intent(out):: i_model ! model used for snb fitting: 1: goody, 2 malkmus, 3 elsasser
+
+integer  :: i,j,k,l
+
+real(eb), parameter :: wm_co2 = 44._eb      ! molecular weight (g/mol)
+real(eb), parameter :: be     = 0.391635_eb ! rotational constant co2
+real(eb), parameter :: q2     = 1.4388_eb   ! speed of light*planck cns/boltzmann
+real(eb), parameter :: t0     = 300._eb     ! reference temperature, in kelvin
+
+real(eb), parameter :: om1 = 1354.91_eb  ! fundamental frequency for transition (000)->(100), units cm-1
+real(eb), parameter :: om2 =  673.0_eb   ! fundamental frequency for transition (000)->(010), units cm-1
+real(eb), parameter :: om3 = 2396.49_eb  ! fundamental frequency for transition (000)->(001), units cm-1
+
+real(eb), dimension(3) :: atot, bcnt
+real(eb), dimension(:), allocatable  :: om, line_strength
+integer, dimension(:,:), allocatable :: transition_matrix
+
+real(eb) :: aa,bb,cc,qq,ee,ff,gg,sminus,splus,sdstrg,gd,com1,com2,
+com3,x13,x23,x33,xbar,om12,alpha,omprim,v3,gam,omvv3,delta,v,omvbar,
+f1,f2,unflo1,unflo2,unflo3,test,vbar1,oma,omb,ttemp,tt,
+t1,tw,ww,temp1,temp2,temp3,dinv,a,b,d,g,w1,dinv1,dinv2,dinv3,q2ot,t0ot,q2ot0
+\end{lstlisting}
+
+\subsection{Subroutine h2o}
+
+\begin{lstlisting}
+elemental subroutine h2o(omega,temp,gc2,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+Given \verb=omega= (wavenumber in $\rm cm^{-1}$), \verb=temp= (temperature in K), and \verb=gc2= (half width at half maximum for Lorentz line, in $\rm cm^{-1}$), this subroutine returns the spectral properties of $\rm H_2O$: spectral mean absorption coefficient (\verb=sdweak=), the collision broadening fine structure parameter (\verb=gdinv=), the Doppler broadening fine structure parameter (\verb=gddinv=), and the narrow band model used (\verb=i_model=).
+
+\begin{lstlisting}
+real(eb), intent(in) :: omega ! wavenumber,  in cm-1
+real(eb), intent(in) :: temp  ! temperature, in kelvin
+real(eb), intent(in) :: gc2   ! half width at half maximum, in cm-1
+
+real(eb), intent(out) :: sdweak  ! spectral mean absorption coefficient, in cm-1
+real(eb), intent(out) :: gddinv  ! line width to line spacing ration for doppler
+real(eb), intent(out) :: gdinv   ! line width to line spacing ratio for lorentz boradening
+integer,  intent(out) :: i_model ! model used for snb fitting: 1: goody, 2 malkmus, 3 elsasser
+
+integer  :: i,j
+real(eb) :: w1, ww, t1, tt, tw, d, b, dinv, ttemp, gd
+real(eb), parameter :: wm_h2o = 18._eb ! molecular weight (g/mol)
+\end{lstlisting}
+
+\subsection{Subroutine co}
+\label{sub:co}
+
+\begin{lstlisting}
+subroutine co(omega,temp,gc4,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+ Given \verb=omega= (wavenumber in $\rm cm^{-1}$), \verb=temp= (temperature in K), and \verb=gc4= (half width at half maximum for Lorentz line, in $\rm cm^{-1}$), this subroutine returns the spectral properties of CO: spectral mean absorption coefficient (\verb=sdweak=), the collision broadening fine structure parameter (\verb=gdinv=), the Doppler broadening fine structure parameter (\verb=gddinv=), and the narrow band model used (\verb=i_model=).
+
+\begin{lstlisting}
+integer j
+real(eb) omega,temp,gc4,sdweak,gdinv,gddinv,aa,bb,cc,qq,
+ee,ff,gg,sminus,splus,sdstrg,b,alpha,a,ome,wx,wy,omprim,
+t0,q2,wm,gd,v,gam,omv,delta,d,omvbar,f1,f2,test,
+dinv,q2ot,toaz
+
+integer, intent(out) :: i_model
+\end{lstlisting}
+
+\subsection{Subroutine pod}
+\label{sub:pod}
+
+\begin{lstlisting}
+elemental subroutine pod(omega,soot_volume_frac,path_length_cm,temp,x_particle)
+\end{lstlisting}
+This subroutine calculates the particle optical depth, \verb=x_particle=, of the soot particles present. Eq.~\ref{eq::soot_optical_depth} is used.
+
+Argument in:
+\begin{itemize}
+ \item \verb=omega=: wavenumber, units: $\rm cm^{-1}$
+ \item \verb=soot_volume_frac=: soot volume fraction. no units
+ \item \verb=path_length_cm=: physical path length. units in $\rm cm$
+ \item \verb=temp=: temperature in Kelvin
+\end{itemize}
+
+Argument out:
+\begin{itemize}
+\item \verb=x_particle=: optical depth due to the presence of soot particle. No units.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in) :: omega, path_length_cm, temp, soot_volume_frac
+
+real(eb), intent(out) :: x_particle
+
+real(eb) :: abco,ff,lambda,rin,rik
+\end{lstlisting}
+
+
+\subsection{Subroutine ch4\_old}
+\label{sub:ch4_old}
+
+\begin{lstlisting}
+subroutine ch4_old(omega,temp,pch4,ptot,gc3,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+Given \verb=omega= (wavenumber in $\rm cm^{-1}$), \verb=temp= (temperature in K), and \verb=gc3= (half width at half maximum for Lorentz line, in $\rm cm^{-1}$), this subroutine returns the spectral properties of $\rm CH_4$ using original RadCal data: spectral mean absorption coefficient (\verb=sdweak=), the collision broadening fine structure parameter (\verb=gdinv=), the Doppler broadening fine structure parameter (\verb=gddinv=), and the narrow band model used (\verb=i_model=).
+
+\begin{lstlisting}
+integer i,j
+real(eb) omega,temp,pch4,ptot,gc3,sdweak,gdinv,gddinv,be,q2,wm,
+gd,om1,om2,om3,om4,com1,com2,com3,com4,dinv,pe,w1,sdb,sda,sdc,q2ot,azot,toaz
+
+integer, intent(out) :: i_model
+
+real(eb), dimension(4) :: atot, bcnt
+\end{lstlisting}
+
+
+\subsection{Subroutine ch4}
+\label{sub:ch4}
+
+\begin{lstlisting}
+subroutine ch4(omega,temp,pch4,ptot,gc3,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pch4=: methane partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of $\rm CH_4$ using new methane data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pch4, ptot, gc3
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out)  :: i_model
+
+real(eb) :: gd, pressure_effective, q2ot, azot, toaz, fact1
+real(eb) :: dinv_ch4
+
+real(eb), parameter :: q2     = 1.4388_eb ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_ch4 = 16.0425_eb ! molecular weight (g/mol)
+
+real(eb), parameter :: be_ch4 = 5.248_eb   ! rotational constants [cm$^{-1}$]
+
+real(eb), dimension(4), parameter ::om_ch4  = (/2914.2_eb, 1526.0_eb, 3020.3_eb, 1306.2_eb/),
+com_ch4 = (/1526.0_eb+2._eb*1306.2_eb, 2914.2_eb+1306.2_eb, 3020.3_eb+1306.2_eb, 1526.0_eb+3020.3_eb/),
+s2_ch4  = (/0.64_eb,17.6_eb,14.8_eb,5.04_eb/)
+
+real(eb), dimension(4) :: atot
+
+integer i
+
+\end{lstlisting}
+
+
+\subsection{Subroutine c3h6}
+\label{sub:c3h6}
+
+\begin{lstlisting}
+subroutine c3h6(omega,temp,pc3h6,ptot,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pc3h6=: propylene partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of propylene using new data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pc3h6, ptot
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out) :: i_model
+
+real(eb) :: q2ot, azot, toaz
+real(eb) :: gd, pressure_effective
+real(eb) :: dinv_c3h6
+
+real(eb), parameter :: q2       = 1.4388_eb  ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_c3h6  = 42.0797_eb ! molecular weight (g/mol)
+
+integer :: i_band, i
+
+logical :: in_band ! true if omega is within some tabulated band, false otherwise
+\end{lstlisting}
+
+
+\subsection{Subroutine c3h8}
+\label{sub:c3h8}
+\begin{lstlisting}
+subroutine c3h8(omega,temp,pc3h8,ptot,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+
+Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pc3h8=: propane partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of propane using new data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pc3h8, ptot
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out) :: i_model
+
+real(eb) :: q2ot, azot, toaz
+real(eb) :: gd, pressure_effective
+real(eb) :: dinv_c3h8
+
+real(eb), parameter :: q2       = 1.4388_eb  ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_c3h8  = 44.0956_eb ! molecular weight (g/mol)
+
+integer :: i_band, i
+
+logical :: in_band ! true if omega is within some tabulated band, false otherwise
+\end{lstlisting}
+
+
+\subsection{Subroutine c7h16}
+\label{sub:c7h16}
+
+\begin{lstlisting}
+subroutine c7h16(omega,temp,pc7h16,ptot,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+
+Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pc7h16=: heptane partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of heptane using new data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pc7h16, ptot
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out) :: i_model
+
+real(eb) :: q2ot, azot, toaz
+real(eb) :: gd, pressure_effective
+real(eb) :: dinv_c7h16
+
+real(eb), parameter :: q2       = 1.4388_eb  ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_c7h16 = 100.2019_eb ! molecular weight (g/mol)
+
+integer :: i_band, i
+
+logical :: in_band ! true if omega is within some tabulated band, false otherwise
+
+\end{lstlisting}
+
+
+\subsection{Subroutine c7h8}
+\label{sub:c7h8}
+\begin{lstlisting}
+subroutine c7h8(omega,temp,pc7h8,ptot,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+
+Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pc7h8=: toluene partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of toluene using new data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pc7h8, ptot
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out) :: i_model
+
+real(eb) :: q2ot, azot, toaz
+real(eb) :: gd, pressure_effective
+real(eb) :: dinv_c7h8
+
+real(eb), parameter :: q2       = 1.4388_eb  ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_c7h8  = 92.1384_eb ! molecular weight (g/mol)
+
+integer :: i_band, i
+
+logical :: in_band ! true if omega is within some tabulated band, false otherwise
+\end{lstlisting}
+
+
+\subsection{Subroutine ch3oh}
+\label{sub:ch3oh}
+
+
+\begin{lstlisting}
+subroutine ch3oh(omega,temp,pch3oh,ptot,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+
+ Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pch3oh=: methanol partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of methanol using new data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pch3oh, ptot
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out) :: i_model
+
+real(eb) :: q2ot, azot, toaz
+real(eb) :: gd, pressure_effective
+real(eb) :: dinv_ch3oh
+
+real(eb), parameter :: q2       = 1.4388_eb  ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_ch3oh = 32.0419_eb ! molecular weight (g/mol)
+integer :: i_band, i
+
+logical :: in_band ! true if omega is within some tabulated band, false otherwise
+\end{lstlisting}
+
+\subsection{Subroutine c5h8o2}
+\label{sub:c5h8o2}
+
+\begin{lstlisting}
+subroutine c5h8o2(omega,temp,pc5h8o2,ptot,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+
+ Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pc5h8o2=: MMA partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of MMA using new data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pc5h8o2, ptot
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out) :: i_model
+
+real(eb) :: q2ot, azot, toaz
+real(eb) :: gd, pressure_effective
+real(eb) :: dinv_c5h8o2
+
+real(eb), parameter :: q2        = 1.4388_eb   ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_c5h8o2 = 100.1158_eb ! molecular weight (g/mol)
+integer :: i_band, i
+
+logical :: in_band ! true if omega is within some tabulated band, false otherwise
+\end{lstlisting}
+
+\subsection{Subroutine c2h6}
+\label{sub:c2h6}
+\begin{lstlisting}
+subroutine c2h6(omega,temp,pc2h6,ptot,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+
+ Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pc2h6=: ethane partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of ethane using new data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pc2h6, ptot
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out) :: i_model
+
+real(eb) :: q2ot, azot, toaz
+real(eb) :: gd, pressure_effective
+real(eb) :: dinv_c2h6
+
+real(eb), parameter :: q2      = 1.4388_eb  ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_c2h6 = 30.0690_eb ! nist webbook data
+integer :: i_band, i
+
+logical :: in_band ! true if omega is within some tabulated band, false otherwise
+\end{lstlisting}
+
+\subsection{Subroutine c2h4}
+\label{sub:c2h4}
+
+\begin{lstlisting}
+subroutine c2h4(omega,temp,pc2h4,ptot,sdweak,gdinv,gddinv,i_model)
+\end{lstlisting}
+
+Given:
+\begin{itemize}
+ \item \verb=omega=: wavenumber in $\rm cm^{-1}$,
+ \item \verb=temp=: temperature in K,
+ \item \verb=pc2h4=: ethylene partial pressure in atm,
+ \item \verb=ptot=: total pressure in atm,
+ \item \verb=gc3=: collisional broadening half-width at half-maximum, units in $\rm cm^{-1}$,
+\end{itemize}
+this subroutine returns the spectral properties of ethylene using new data:
+\begin{itemize}
+ \item \verb=sdweak=: spectral mean absorption coefficient, units in $\rm atm^{-1}.cm^{-1}$,
+ \item \verb=gdinv=: the collision broadening fine structure parameter, dimensionless,
+ \item \verb=gddinv=: the Doppler broadening fine structure parameter, dimensionless,
+ \item \verb=i_model=: the narrow band model used.
+\end{itemize}
+
+\begin{lstlisting}
+real(eb), intent(in)  :: omega, temp, pc2h4, ptot
+real(eb), intent(out) :: sdweak, gdinv, gddinv
+
+integer, intent(out) :: i_model
+
+real(eb) :: q2ot, azot, toaz
+real(eb) :: gd, pressure_effective
+real(eb) :: dinv_c2h4
+
+real(eb), parameter :: q2      = 1.4388_eb  ! q2 = speed of light*planck cns/boltzmann
+real(eb), parameter :: wm_c2h4 = 28.0532_eb ! nist webbook data
+integer :: i_band, i
+
+logical :: in_band ! true if omega is within some tabulated band, false otherwise
+\end{lstlisting}
+
+\subsection{Function get\_spectral\_absorption}
+
+\begin{lstlisting}
+pure real(eb) function get_spectral_absorption(omega,temp,sd_temp,bounds,absorption_data)
+\end{lstlisting}
+This function returns interpolated (in temperature and wavenumber) values of spectral absorption.
+
+Variables in:
+\begin{itemize}
+ \item \verb=omega=  : wavenumber, units in $\rm cm^{-1}$
+ \item \verb=temp=   : gas temperature, units in K
+ \item \verb=sd_temp=: vector of temperature measurements, units in K
+ \item \verb=bounds= : vector of wavenumber bounds and spacing for a given band, \verb=dimensions(3)=
+ \item \verb=absorption_data=: array of species spectral measurements. Note: first dimension equals to dimension of \verb=sd_temp=.
+\end{itemize}
+
+Action: Bilinear interpolation of \verb=absorption_data=.
+
+\begin{lstlisting}
+ real(eb), intent(in) :: omega
+ real(eb), intent(in) :: temp
+ real(eb), dimension(:), intent(in)   :: sd_temp, bounds
+ real(eb), dimension(:,:), intent(in) :: absorption_data
+
+ real(eb) :: delta_t
+ real(eb) :: delta_w
+ real(eb) :: w1
+ real(eb) :: omega_min, omega_max, delta_omega
+ real(eb) :: ttemp
+ real(eb) :: interpolated_value
+
+ integer :: n_temp, n_bounds, n_abs_data1, n_abs_data2
+ integer :: i_omega, i_temp, i_omega1, i_omega2
+
+ logical :: cross
+\end{lstlisting}
+
+\subsection{Function planck}
+
+\begin{lstlisting}
+elemental real(eb) function planck(temp,lambda)
+\end{lstlisting}
+Computes blackbody distribution at wavelength \verb=lambda= and at temperature \verb=temp=. Values returned in units of $\rm W/m^{2}/str/cm^{-1}$. Solves Eq.~\ref{eq:Planck_WL}.
+
+Variables in:
+\begin{itemize}
+ \item \verb=temp=: temperature, units in K
+ \item \verb=lambda=: wavelength, units in $\rm \mu m$
+\end{itemize}
+
+\begin{lstlisting}
+ real (eb), intent(in):: temp, lambda
+ real (eb), parameter :: q1 = 1.19088e8_eb ! q1 = 2*speed of light$^2$*planck\_cnst
+ real (eb), parameter :: q2 = 14388._eb    ! q2 = speed of light*planck cns/boltzmann
+ real (eb) :: c   ! c = lambda * temp
+\end{lstlisting}
+
+\subsection{Function planck\_wn}
+
+\begin{lstlisting}
+elemental real(eb) function planck_wn(temp,omega)
+\end{lstlisting}
+Computes blackbody distribution at wavenumber \verb=omega= and at temperature \verb=temp=. Values returned in units of $\rm W/m^{2}/str/cm^{-1}$. Solves Eq.~\ref{eq:Planck_WL}.
+
+Variables in:
+\begin{itemize}
+ \item \verb=temp=: temperature, units in K
+ \item \verb=omega=: wavenumber, units in $\rm cm^{-1}$
+\end{itemize}
+
+\begin{lstlisting}
+ real (eb), intent(in):: temp, omega
+
+ real (eb), parameter :: q1 = 1.19088e-8_eb ! q1 = 2*speed of light$^2$*planck\_cnst
+ real (eb), parameter :: q2 = 1.4388_eb
+ real (eb) :: c   ! c = temp/omega
+\end{lstlisting}
+
+
+\subsection{Function integration}
+\label{fun:integration}
+\begin{lstlisting}
+real(eb) function integration(x,y,io)
+\end{lstlisting}
+ Performs numerical integration of the vector \verb=y= over the range given by vector \verb=x=. It does not assume any regularity of \verb=x=. The integration is based on Simpson rule over non regular abscissa, uses Lagrangian interpolation using 3 points (quadratic interpolation). Note: \verb=io= is the unit of output file, which is needed for printing error message.
+
+\begin{lstlisting}
+ real(eb), intent(in), dimension(:) :: x,y
+ integer,  intent(in) :: io
+
+ real(eb) :: alpha, beta, gamma, b, a, segment_int
+ integer  :: i_point, n_points, i, j ,k
+\end{lstlisting}
+
+
+\subsection{Subroutine rcalloc}
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+This subroutine allocates memory and assigns the variables containing the spectral properties of the species present in RadCal.
+
+\subsection{Subroutine populate\_species}
+\label{sub:populate_species}
+
+\begin{lstlisting}
+subroutine populate_species(io)
+\end{lstlisting}
+ This function populates the variable \verb=species= that contains the RadCal name and the name of the species present in gas phase.
+
+\begin{lstlisting}
+ integer, intent(in) :: io
+\end{lstlisting}
+
+
+\subsection{Function index\_species}
+\label{fun:index_species}
+
+\begin{lstlisting}
+function index_species(molecule) result(i_molecule)
+\end{lstlisting}
+
+This function returns the index of the molecule presents in the variable \verb=species=.
+\verb=i_molecule= is such that:\\
+ molecule = species(i\_molecule)\%id or\\
+ molecule = species(i\_molecule)\%radcal\_id.
+
+\begin{lstlisting}
+ character(len=*) :: molecule
+
+ integer :: i_molecule
+ integer :: i_species
+ logical :: found
+
+\end{lstlisting}
+
+
+\subsection{Subroutine rcdealloc}
+
+\begin{lstlisting}
+subroutine rcdealloc
+\end{lstlisting}
+Deallocates arrays variables. Performed prior to RadCal exit.
+
+\subsection{Subroutine termination}
+\label{sub:termination}
+\begin{lstlisting}
+subroutine termination(ierr,io)
+\end{lstlisting}
+ Subroutine called when exceptions are raised. Terminates the program and writes error messages depending on the context.
+
+ Variables passed in:
+ \begin{itemize}
+  \item  \verb=ierr= : error message indice
+  \item  \verb=io=   : file unit number.
+ \end{itemize}
+
+\begin{lstlisting}
+ integer, intent(in) :: ierr, io
+ character(len=2056) :: message
+\end{lstlisting}
+
+
+\subsection{Subroutine write\_input}
+\label{sub:write_input}
+
+\begin{lstlisting}
+subroutine write_input(io)
+\end{lstlisting}
+ This subroutine writes a default \verb=RADCAL.in= in the case that no \verb=RADCAL.in= is provided.
+ In particular, it writes the available species. This subroutine should only be called when \verb=RADCAL.in= does not exist.
+\begin{lstlisting}
+ integer, intent(in) :: io
+
+ integer, parameter  :: i_input = 10
+ integer             :: ierr
+ character(len=30)   :: filename
+
+ character(len=2048) :: header
+ character(len=2048) :: line_text
+ character           :: character_line(80)
+
+ logical             :: file_exist
+
+ integer :: i_species, i
+
+\end{lstlisting}
+
+\subsection{Subroutine read\_input}
+\label{sub:read_input}
+
+\begin{lstlisting}
+subroutine read_input(io)
+\end{lstlisting}
+ This subroutine reads the input file \verb=RADCAL.in= (unit \verb=io=).
+
+\begin{lstlisting}
+ integer, intent(in) :: io
+
+ integer           :: i_input, ierr
+ character(len=30) :: filename
+
+ logical           :: file_exist
+
+\end{lstlisting}
+
+\subsection{Subroutine read\_point}
+\label{sub:read_point}
+
+\begin{lstlisting}
+subroutine read_point(i_input,i_output)
+\end{lstlisting}
+ This subroutine reads the input file \verb=RADCAL.in= (unit \verb=i_input=) and searches for the keyword \verb=path_segment=. It counts the number of homogeneous segments that comprise a pathline, and assigns user defined values of species mole fractions or volume fraction (only for soot), temperature (assumed to be uniform along a given homogeneous segment of the pathline), length \verb=length=, and pressure (in atm) to all the segments.
+
+ Units:
+ \begin{itemize}
+  \item \verb=T=, temperature, in K
+  \item \verb=LENGTH=, homogeneous segment length, in $m$
+  \item species data (\verb=x<species>=), in mole fraction
+  \item \verb=pressure=, in atm
+  \item \verb=fv=, soot volume fraction, dimensionless.
+ \end{itemize}
+
+\begin{lstlisting}
+ integer, intent(in) :: i_input  ! unit of the input file. alreay opened
+ integer, intent(in) :: i_output ! unit of the output file. alreay opened
+
+ type gas_phase
+    real(kind=eb), pointer :: obj
+    character(len=30)      :: name
+ end type gas_phase
+
+ type(gas_phase), allocatable, dimension(:) ::  Mole_Fraction
+
+ real(kind=eb) :: sum_mole_fraction
+
+ real(kind=eb) :: t, length, pressure, fv
+
+ real(kind=eb), target :: xco2, xh2o, xco, xch4, xc2h4, xc2h6, xc3h8,xc3h6, xc7h8, xc7h16, xch3oh, xmma, xn2, xch4_old, xo2
+
+ character(len=255) :: line
+
+ integer :: n_segment, i_segment, i_species, i_species_gas, status, i_fv
+
+\end{lstlisting}
+
+
+\subsection{Subroutine read\_band}
+\label{sub:read_band}
+\begin{lstlisting}
+subroutine read_band(i_input,i_output)
+\end{lstlisting}
+This subroutine reads the input file \verb=RADCAL.in= (unit \verb=i_input=) and searches for the keyword \verb=&BANDS=. \verb=&BANDS= defines the lower and upper bound of the spectrum to be computed, \verb=ommin= and \verb=ommax=, respectively. Both are given in cm$^{-1}$.
+
+\begin{lstlisting}
+ integer, intent(in) :: i_input  ! unit of the input file. alreay opened
+ integer, intent(in) :: i_output ! unit of the output file. alreay opened
+
+ integer :: io_err ! error condition number
+\end{lstlisting}
+
+
+\subsection{Subroutine read\_wall}
+\label{sub:read_wall}
+\begin{lstlisting}
+subroutine read_wall(i_input,i_output)
+\end{lstlisting}
+ This subroutine reads the input file \verb=RADCAL.in= (unit \verb=i_input=) and searches for the keyword \verb=&WALL= which defines the wall (or infinity) temperature: \verb=TWALL=. In RadCal, the wall emits like a blackbody of temperature \verb=TWALL=.
+
+\begin{lstlisting}
+ integer, intent(in) :: i_input  ! unit of the input file. alreay opened
+ integer, intent(in) :: i_output ! unit of the output file. alreay opened
+
+ integer :: io_err ! catch the value of the error raised by output subroutine
+\end{lstlisting}
+
+
+\subsection{Subroutine read\_header}
+\label{sub:read_header}
+
+\begin{lstlisting}
+subroutine read_header(i_input,i_output)
+\end{lstlisting}
+This subroutine reads the input file \verb=RADCAL.in= (unit \verb=i_input=) and searches for the keyword \verb=&HEADER=. \verb=&HEADER= defines the case id (\verb=CHID=) used to generate the output Tecplot file and the case title (\verb=TITLE=), which is to be printed in the output file.
+
+\begin{lstlisting}
+ integer, intent(in) :: i_input  ! unit of the input file. alreay opened
+ integer, intent(in) :: i_output ! unit of the output file. alreay opened
+
+ integer :: io_err ! catch the value of the error raised by output subroutine
+\end{lstlisting}
+
+\section{Driver (main) Program}
+\subsection{Program driver}
+\label{prog:driver}
+
+
+\begin{lstlisting}
+ use radcal
+
+\end{lstlisting}
+
+This is the main program. It operates the different RadCal functions that read the input file, allocate the needed variables, solve the RTE, and print the results. Note: the type \verb=real(exb)= is used for intrinsic timer routine \verb=cpu_time=. The floating type \verb=eb= is defined in the \verb=radcal= module.
+
+\begin{lstlisting}
+ integer, parameter :: exb = selected_real_kind(16)
+
+ real(eb), allocatable, dimension(:) :: transmissivity
+
+ real(eb) :: amean, planck_mean_absorption, flux, total_length_m,total_length_cm, total_transmissivity
+
+ integer :: io
+ character(len=255) :: filename
+
+ real(exb) :: time_init
+ real(exb) :: time_end
+\end{lstlisting}
+
+\subsection{Subroutine tau\_print}
+\label{sub:tau_print}
+
+\begin{lstlisting}
+subroutine tau_print(case_id, pressure, path_length, transmissivity, wave_length)
+\end{lstlisting}
+This function prints, in ASCII format, the wavenumber in $\rm cm^{-1}$, the transmissivity in \%, and the incident radiance in $\rm W/m^{2}/str/cm^{-1}$, in the file \verb=<case_id>.tec=.
+
+\begin{lstlisting}
+ use radcal, only : eb, incident_radiance
+\end{lstlisting}
+
+
+\begin{lstlisting}
+ real(eb), dimension(:), intent(in) :: wave_length    ! Wave length in micron
+ real(eb), dimension(:), intent(in) :: transmissivity ! Transmissivity
+ real(eb), intent(in) :: pressure
+ real(eb), intent(in) :: path_length
+
+ character(len=255), intent(in) :: case_id
+
+ character(len=15)  :: pressure_atm
+ character(len=15)  :: path_length_m
+ character(len=255) :: filename
+ character(len=50)  :: format_output
+
+ integer :: n_max
+ integer :: i_tecfile, i
+\end{lstlisting}
