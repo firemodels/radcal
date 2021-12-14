@@ -54,14 +54,6 @@ setup_win:
 .f90.obj:
 	$(FCOMPL) -c $(FFLAGS) $<
 
-# Files which have OpenMP compiler directives are compiled using the FOPENMPFLAG and can be enabled/disabled on a per-file basis.
-
-func.o: FFLAGS += $(FOPENMPFLAGS)
-irad.o: FFLAGS += $(FOPENMPFLAGS)
-
-func.obj: FFLAGS += $(FOPENMPFLAGS)
-irad.obj: FFLAGS += $(FOPENMPFLAGS)
-
 # Windows Intel Compiler
 
 #*** note: the following scripts (located in ..\Scripts directory) must be run before running make with this target
@@ -69,53 +61,47 @@ irad.obj: FFLAGS += $(FOPENMPFLAGS)
 
 intel_win_64 : FFLAGS = /O2 /Qipo /traceback $(GITINFO) 
 intel_win_64 : FCOMPL = ifort
-intel_win_64 : FOPENMPFLAGS = /Qopenmp
 intel_win_64 : obj = radcal_win_64
 intel_win_64 : setup_win $(objwin_serial)
-	$(FCOMPL) -o $(obj) $(FFLAGS) $(FOPENMPFLAGS) /F1000000000 $(objwin_serial)
+	$(FCOMPL) -o $(obj) $(FFLAGS) /F1000000000 $(objwin_serial)
 
-intel_win_64_db : FFLAGS = /Od /nologo /debug:full /check /warn /extend_source:132 /traceback /stand:f08 /Z7 /MDd $(GITINFO) 
+intel_win_64_db : FFLAGS = /Od /nologo /debug:full /check /warn /extend_source:132 /traceback /stand:f18 /Z7 /MDd $(GITINFO) 
 intel_win_64_db : FCOMPL = ifort
-intel_win_64_db : FOPENMPFLAGS = /Qopenmp
 intel_win_64_db : obj = radcal_win_64_db
 intel_win_64_db : setup_win $(objwin_serial)
-	$(FCOMPL) -o $(obj) $(FFLAGS) $(FOPENMPFLAGS) /F1000000000 $(objwin_serial)
+	$(FCOMPL) -o $(obj) $(FFLAGS) /F1000000000 $(objwin_serial)
 
 # Intel Compiler for Linux
 
 intel_linux_64 : FFLAGS = -m64 -O2 -ipo -traceback $(GITINFO) 
 intel_linux_64 : LFLAGS = -static-intel
 intel_linux_64 : FCOMPL = ifort
-intel_linux_64 : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
 intel_linux_64 : obj = radcal_intel_linux_64
 intel_linux_64 : setup $(obj_serial)
-	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
 
-intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
+intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f18 $(GITINFO) 
 intel_linux_64_db : LFLAGS = -static-intel
 intel_linux_64_db : FCOMPL = ifort
-intel_linux_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
 intel_linux_64_db : obj = radcal_intel_linux_64_db
 intel_linux_64_db : setup $(obj_serial)
-	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
 
 # OSX   
 
 intel_osx_64 : FFLAGS = -m64 -O2 $(GITINFO) 
 intel_osx_64 : LFLAGS = -static-intel
-intel_osx_64 : FOPENMPFLAGS = -qopenmp -qopenmp-link static
 intel_osx_64 : FCOMPL = ifort
 intel_osx_64 : obj = radcal_intel_osx_64
 intel_osx_64 : setup $(obj_serial)
-	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
 
-intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
+intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f18 $(GITINFO) 
 intel_osx_64_db : LFLAGS = -static-intel
-intel_osx_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static
 intel_osx_64_db : FCOMPL = ifort
 intel_osx_64_db : obj = radcal_intel_osx_64_db
 intel_osx_64_db : setup $(obj_serial)
-	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
 
 # *** Object Dependencies ***
 
