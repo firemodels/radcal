@@ -56,17 +56,14 @@ setup_win:
 
 # Windows Intel Compiler
 
-#*** note: the following scripts (located in ..\Scripts directory) must be run before running make with this target
-#    ..\Scripts\ifortvars intel64
-
 intel_win_64 : FFLAGS = /O2 /Qipo /traceback $(GITINFO) 
-intel_win_64 : FCOMPL = ifort
+intel_win_64 : FCOMPL = ifx
 intel_win_64 : obj = radcal_win_64
 intel_win_64 : setup_win $(objwin_serial)
 	$(FCOMPL) -o $(obj) $(FFLAGS) /F1000000000 $(objwin_serial)
 
 intel_win_64_db : FFLAGS = /Od /nologo /debug:full /check /warn /extend_source:132 /traceback /stand:f18 /Z7 /MDd $(GITINFO) 
-intel_win_64_db : FCOMPL = ifort
+intel_win_64_db : FCOMPL = ifx
 intel_win_64_db : obj = radcal_win_64_db
 intel_win_64_db : setup_win $(objwin_serial)
 	$(FCOMPL) -o $(obj) $(FFLAGS) /F1000000000 $(objwin_serial)
@@ -75,14 +72,14 @@ intel_win_64_db : setup_win $(objwin_serial)
 
 intel_linux_64 : FFLAGS = -m64 -O2 -ipo -traceback $(GITINFO) 
 intel_linux_64 : LFLAGS = -static-intel
-intel_linux_64 : FCOMPL = ifort
+intel_linux_64 : FCOMPL = ifx
 intel_linux_64 : obj = radcal_intel_linux_64
 intel_linux_64 : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
 
 intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f18 $(GITINFO) 
 intel_linux_64_db : LFLAGS = -static-intel
-intel_linux_64_db : FCOMPL = ifort
+intel_linux_64_db : FCOMPL = ifx
 intel_linux_64_db : obj = radcal_intel_linux_64_db
 intel_linux_64_db : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
@@ -91,14 +88,14 @@ intel_linux_64_db : setup $(obj_serial)
 
 intel_osx_64 : FFLAGS = -m64 -O2 $(GITINFO) 
 intel_osx_64 : LFLAGS = -static-intel
-intel_osx_64 : FCOMPL = ifort
+intel_osx_64 : FCOMPL = ifx
 intel_osx_64 : obj = radcal_intel_osx_64
 intel_osx_64 : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
 
 intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f18 $(GITINFO) 
 intel_osx_64_db : LFLAGS = -static-intel
-intel_osx_64_db : FCOMPL = ifort
+intel_osx_64_db : FCOMPL = ifx
 intel_osx_64_db : obj = radcal_intel_osx_64_db
 intel_osx_64_db : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
