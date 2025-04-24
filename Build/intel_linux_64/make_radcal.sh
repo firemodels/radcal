@@ -1,9 +1,9 @@
 #!/bin/bash
-platform=intel64
+
 dir=`pwd`
 target=${dir##*/}
 
-source $IFORT_COMPILER/bin/compilervars.sh $platform
+export FDS_BUILD_TARGET=$target
 source ../Scripts/set_compilers.sh
 
 echo Building $target
