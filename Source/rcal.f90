@@ -1,4 +1,4 @@
-! This file is common to both the RADCAL and the FDS source code repositories. If you change in one location, 
+! This file is common to both the RADCAL and the FDS source code repositories. If you change in one location,
 ! please make sure that the change is also made in the other location.
 
 !> \brief Variable defintions specific to RADCAL
@@ -376,8 +376,6 @@ AVG_TEMP = SUM(TEMP_GAS*PATH_LENGTH_CM)/TOTAL_LENGTH_CM
 ! LOOP SPECTRUM COMPUTES EACH SPECTRAL CONTRIBUTION,
 ! LOOP OVER EACH WAVE NUMBER INTERVALS
 ! THIS LOOP CAN BE PARALLIZED WITH OPENMP
-
-!!                   BELOW ARE OPENMP INSTRUCTIONS
 
 LSPECTRUM: DO I_WAVENUMB = 1, NOM
    CURTIS_XSTAR      = 0.0_EB

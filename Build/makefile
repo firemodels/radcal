@@ -9,20 +9,30 @@
 
 ifeq ($(shell echo "check_quotes"),"check_quotes")
 # windows
-  BUILD_DATE := $(shell date /t) $(shell time /t)
+  BUILD_DATE := $(shell powershell -Command "(Get-Date).ToString('ddd-MM/dd/yyyy-hh:mm-tt')")
+  GIT_STAT := $(shell ..\Scripts\gitstat)
   GIT_HASH := $(shell ..\Scripts\githash)
+  GIT_BRANCH := $(shell ..\Scripts\gitbranch)
   GIT_DATE := $(shell ..\Scripts\gitlog)
 else
 # linux/osx
-  GIT_HASH := $(shell git describe --long --dirty)
+  SHELL:=/bin/bash
+  GIT_HASH := $(shell git describe --long --abbrev=7)
+  ifeq ("$(shell git diff --shortstat $(VPATH)/*.f90)","")
+    GIT_STAT :=
+  else
+    GIT_STAT := -dirty
+  endif
   GIT_DATE := $(shell git log -1 --format=%cd)
+  GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
   BUILD_DATE := $(shell date "+%b %d, %Y  %T")
 # The preprocessor used by xlf uses comma as separation between preprocessing commands.
 # Commas needs to be escaped if they are to be used as part of a value in a preprocessing variable.
-  BUILD_DATE_XLF := $(shell date "+%b %d\, %Y  %T")  
+  BUILD_DATE_XLF := $(shell date "+%b %d\, %Y  %T")
+  CLT_VERSION := $(shell ../Scripts/osx_clt.sh)
 endif
 
-GITINFO_BASE=-DGITHASH_PP=\"$(GIT_HASH)\" -DGITDATE_PP=\""$(GIT_DATE)\""
+GITINFO_BASE=-DGITHASH_PP=\"$(GIT_HASH)$(GIT_STAT)-$(GIT_BRANCH)\" -DGITDATE_PP=\""$(GIT_DATE)\""
 GITINFO=-fpp $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
 GITINFOGNU=-cpp $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
 GITINFOXLF=-qsuffix=cpp=f90 '-WF,-DGITHASH_PP=\"$(GIT_HASH)\",-DGITDATE_PP=\"$(GIT_DATE)\",-DBUILDDATE_PP=\"$(BUILD_DATE_XLF)\"'
@@ -54,48 +64,49 @@ setup_win:
 .f90.obj:
 	$(FCOMPL) -c $(FFLAGS) $<
 
-# Windows Intel Compiler
+# Windows Intel Fortran Compiler
+#*** Note: the script, Build\Scripts\setup_intel_compilers.bat, must be run before running make with this target
 
-intel_win_64 : FFLAGS = /O2 /Qipo /traceback $(GITINFO) 
-intel_win_64 : FCOMPL = ifx
+intel_win_64 : FFLAGS = -D_WIN32 /Qipo /O2 /I$(MPIINCLUDE) /wrap-margin- $(GITINFO) /Qdiag-disable:10448
+intel_win_64 : FCOMPL = $(COMP_FC)
 intel_win_64 : obj = radcal_win_64
 intel_win_64 : setup_win $(objwin_serial)
 	$(FCOMPL) -o $(obj) $(FFLAGS) /F1000000000 $(objwin_serial)
 
-intel_win_64_db : FFLAGS = /Od /nologo /debug:full /check /warn /extend_source:132 /traceback /stand:f18 /Z7 /MDd $(GITINFO) 
-intel_win_64_db : FCOMPL = ifx
+intel_win_64_db : FLAGS = -D_WIN32 /Od /nologo /debug:all /Z7 /extend-source:132 /warn:unused /warn:nointerfaces /Qtrapuv /fp:strict /fp:except /traceback /check:all /stand:f18 /wrap-margin- $(GITINFO)  /Qdiag-disable:10448
+intel_win_64_db : FCOMPL = $(COMP_FC)
 intel_win_64_db : obj = radcal_win_64_db
 intel_win_64_db : setup_win $(objwin_serial)
 	$(FCOMPL) -o $(obj) $(FFLAGS) /F1000000000 $(objwin_serial)
 
 # Intel Compiler for Linux
 
-intel_linux_64 : FFLAGS = -m64 -O2 -ipo -traceback $(GITINFO) 
+intel_linux_64 : FFLAGS = -m64 -O2 -ipo -no-wrap-margin $(GITINFO) -DUSE_IFPORT  -diag-disable=10448
 intel_linux_64 : LFLAGS = -static-intel
-intel_linux_64 : FCOMPL = ifx
+intel_linux_64 : FCOMPL = $(COMP_FC)
 intel_linux_64 : obj = radcal_intel_linux_64
 intel_linux_64 : setup $(obj_serial)
-	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
+	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
 
-intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f18 $(GITINFO) 
+intel_linux_64_db : FFLAGS = -m64 -check all -warn all -diag-error=remark,warn,error -O0 -g -traceback -fpe0 -nofltconsistency -stand:f18 -no-wrap-margin $(GITINFO) -DUSE_IFPORT -diag-disable=10448_INTEL
 intel_linux_64_db : LFLAGS = -static-intel
-intel_linux_64_db : FCOMPL = ifx
+intel_linux_64_db : FCOMPL = $(COMP_FC)
 intel_linux_64_db : obj = radcal_intel_linux_64_db
 intel_linux_64_db : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
 
-# OSX   
+# OSX
 
-intel_osx_64 : FFLAGS = -m64 -O2 $(GITINFO) 
+intel_osx_64 : FFLAGS = -m64 -O2 -stand:f18 -no-wrap-margin $(GITINFO)
 intel_osx_64 : LFLAGS = -static-intel
-intel_osx_64 : FCOMPL = ifx
+intel_osx_64 : FCOMPL = $(COMP_FC)
 intel_osx_64 : obj = radcal_intel_osx_64
 intel_osx_64 : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
 
-intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f18 $(GITINFO) 
+intel_osx_64_db : FFLAGS = -m64 -check all -fp-stack-check -warn unused -O0 -auto -WB -g -traceback -fpe0 -nofltconsistency -stand:f18 -no-wrap-margin $(GITINFO)
 intel_osx_64_db : LFLAGS = -static-intel
-intel_osx_64_db : FCOMPL = ifx
+intel_osx_64_db : FCOMPL = $(COMP_FC)
 intel_osx_64_db : obj = radcal_intel_osx_64_db
 intel_osx_64_db : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) -o $(obj) $(obj_serial)
@@ -112,9 +123,9 @@ main.obj : rmod.obj rcal.obj
 
 .PHONY : clean
 clean:
-	-rm -f *.o *.mod *.obj 
+	-rm -f *.o *.mod *.obj
 
 .PHONY : winclean
 winclean:
-	-erase *.mod *.obj 
+	-erase *.mod *.obj
 
