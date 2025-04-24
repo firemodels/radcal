@@ -9,20 +9,30 @@
 
 ifeq ($(shell echo "check_quotes"),"check_quotes")
 # windows
-  BUILD_DATE := $(shell date /t) $(shell time /t)
+  BUILD_DATE := $(shell powershell -Command "(Get-Date).ToString('ddd-MM/dd/yyyy-hh:mm-tt')")
+  GIT_STAT := $(shell ..\Scripts\gitstat)
   GIT_HASH := $(shell ..\Scripts\githash)
+  GIT_BRANCH := $(shell ..\Scripts\gitbranch)
   GIT_DATE := $(shell ..\Scripts\gitlog)
 else
 # linux/osx
-  GIT_HASH := $(shell git describe --long --dirty)
+  SHELL:=/bin/bash
+  GIT_HASH := $(shell git describe --long --abbrev=7)
+  ifeq ("$(shell git diff --shortstat $(VPATH)/*.f90)","")
+    GIT_STAT :=
+  else
+    GIT_STAT := -dirty
+  endif
   GIT_DATE := $(shell git log -1 --format=%cd)
+  GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
   BUILD_DATE := $(shell date "+%b %d, %Y  %T")
 # The preprocessor used by xlf uses comma as separation between preprocessing commands.
 # Commas needs to be escaped if they are to be used as part of a value in a preprocessing variable.
-  BUILD_DATE_XLF := $(shell date "+%b %d\, %Y  %T")  
+  BUILD_DATE_XLF := $(shell date "+%b %d\, %Y  %T")
+  CLT_VERSION := $(shell ../Scripts/osx_clt.sh)
 endif
 
-GITINFO_BASE=-DGITHASH_PP=\"$(GIT_HASH)\" -DGITDATE_PP=\""$(GIT_DATE)\""
+GITINFO_BASE=-DGITHASH_PP=\"$(GIT_HASH)$(GIT_STAT)-$(GIT_BRANCH)\" -DGITDATE_PP=\""$(GIT_DATE)\""
 GITINFO=-fpp $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
 GITINFOGNU=-cpp $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
 GITINFOXLF=-qsuffix=cpp=f90 '-WF,-DGITHASH_PP=\"$(GIT_HASH)\",-DGITDATE_PP=\"$(GIT_DATE)\",-DBUILDDATE_PP=\"$(BUILD_DATE_XLF)\"'
@@ -54,65 +64,49 @@ setup_win:
 .f90.obj:
 	$(FCOMPL) -c $(FFLAGS) $<
 
-# Files which have OpenMP compiler directives are compiled using the FOPENMPFLAG and can be enabled/disabled on a per-file basis.
+# Windows Intel Fortran Compiler
+#*** Note: the script, Build\Scripts\setup_intel_compilers.bat, must be run before running make with this target
 
-func.o: FFLAGS += $(FOPENMPFLAGS)
-irad.o: FFLAGS += $(FOPENMPFLAGS)
-
-func.obj: FFLAGS += $(FOPENMPFLAGS)
-irad.obj: FFLAGS += $(FOPENMPFLAGS)
-
-# Windows Intel Compiler
-
-#*** note: the following scripts (located in ..\Scripts directory) must be run before running make with this target
-#    ..\Scripts\ifortvars intel64
-
-intel_win_64 : FFLAGS = /O2 /Qipo /traceback $(GITINFO) 
-intel_win_64 : FCOMPL = ifort
-intel_win_64 : FOPENMPFLAGS = /Qopenmp
+intel_win_64 : FFLAGS = /O2 /Qipo /traceback $(GITINFO)
+intel_win_64 : FCOMPL = $(COMP_FC)
 intel_win_64 : obj = radcal_win_64
 intel_win_64 : setup_win $(objwin_serial)
 	$(FCOMPL) -o $(obj) $(FFLAGS) $(FOPENMPFLAGS) /F1000000000 $(objwin_serial)
 
-intel_win_64_db : FFLAGS = /Od /nologo /debug:full /check /warn /extend_source:132 /traceback /stand:f08 /Z7 /MDd $(GITINFO) 
-intel_win_64_db : FCOMPL = ifort
-intel_win_64_db : FOPENMPFLAGS = /Qopenmp
+intel_win_64_db : FFLAGS = /Od /nologo /debug:full /check /warn /extend_source:132 /traceback /stand:f08 /Z7 /MDd $(GITINFO)
+intel_win_64_db : FCOMPL = $(COMP_FC)
 intel_win_64_db : obj = radcal_win_64_db
 intel_win_64_db : setup_win $(objwin_serial)
 	$(FCOMPL) -o $(obj) $(FFLAGS) $(FOPENMPFLAGS) /F1000000000 $(objwin_serial)
 
 # Intel Compiler for Linux
 
-intel_linux_64 : FFLAGS = -m64 -O2 -ipo -traceback $(GITINFO) 
+intel_linux_64 : FFLAGS = -m64 -O2 -ipo -traceback $(GITINFO)
 intel_linux_64 : LFLAGS = -static-intel
-intel_linux_64 : FCOMPL = ifort
-intel_linux_64 : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
+intel_linux_64 : FCOMPL = $(COMP_FC)
 intel_linux_64 : obj = radcal_intel_linux_64
 intel_linux_64 : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
 
-intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
+intel_linux_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO)
 intel_linux_64_db : LFLAGS = -static-intel
-intel_linux_64_db : FCOMPL = ifort
-intel_linux_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static -liomp5
+intel_linux_64_db : FCOMPL = $(COMP_FC)
 intel_linux_64_db : obj = radcal_intel_linux_64_db
 intel_linux_64_db : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
 
-# OSX   
+# OSX
 
-intel_osx_64 : FFLAGS = -m64 -O2 $(GITINFO) 
+intel_osx_64 : FFLAGS = -m64 -O2 $(GITINFO)
 intel_osx_64 : LFLAGS = -static-intel
-intel_osx_64 : FOPENMPFLAGS = -qopenmp -qopenmp-link static
-intel_osx_64 : FCOMPL = ifort
+intel_osx_64 : FCOMPL = $(COMP_FC)
 intel_osx_64 : obj = radcal_intel_osx_64
 intel_osx_64 : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
 
-intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO) 
+intel_osx_64_db : FFLAGS = -m64 -check -warn unused -O0 -auto -WB -traceback -g -fpe0 -fltconsistency -stand:f08 $(GITINFO)
 intel_osx_64_db : LFLAGS = -static-intel
-intel_osx_64_db : FOPENMPFLAGS = -qopenmp -qopenmp-link static
-intel_osx_64_db : FCOMPL = ifort
+intel_osx_64_db : FCOMPL = $(COMP_FC)
 intel_osx_64_db : obj = radcal_intel_osx_64_db
 intel_osx_64_db : setup $(obj_serial)
 	$(FCOMPL) $(FFLAGS) $(LFLAGS) $(FOPENMPFLAGS) -o $(obj) $(obj_serial)
@@ -129,9 +123,9 @@ main.obj : rmod.obj rcal.obj
 
 .PHONY : clean
 clean:
-	-rm -f *.o *.mod *.obj 
+	-rm -f *.o *.mod *.obj
 
 .PHONY : winclean
 winclean:
-	-erase *.mod *.obj 
+	-erase *.mod *.obj
 
