@@ -3,6 +3,7 @@
 dir=`pwd`
 target=${dir##*/}
 
+export FDS_BUILD_TARGET=$target
 source ../Scripts/set_compilers.sh
 
 echo Building $target
