@@ -1,9 +1,8 @@
 #!/bin/bash
-platform=intel
+
 dir=`pwd`
 target=${dir##*/}
 
-source $IFORT_COMPILER/bin/compilervars.sh $platform
 source ../Scripts/set_compilers.sh
 
 echo Building $target
