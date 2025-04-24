@@ -3,6 +3,7 @@ platform=intel64
 dir=`pwd`
 target=${dir##*/}
 
+source ../Scripts/set_compilers.sh
 
 echo Building $target
 `ifort -v`
